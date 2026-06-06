@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './shared/database/database.module';
+import { LgpdMiddleware } from './shared/middleware/lgpd.middleware';
 
 @Module({
   imports: [
@@ -8,4 +9,8 @@ import { DatabaseModule } from './shared/database/database.module';
     DatabaseModule,
   ],
 })
-export class AppModule {}
+export class AppModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(LgpdMiddleware).forRoutes('*');
+  }
+}
