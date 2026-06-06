@@ -1,0 +1,5 @@
+backend/node_modules
+backend/dist
+mobile/node_modules
+.env
+.superpowers/
