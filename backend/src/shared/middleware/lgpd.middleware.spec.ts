@@ -19,12 +19,19 @@ describe('LgpdMiddleware', () => {
       'X-Data-Processing-Basis',
       'legitimate-interest',
     );
+    expect(mockRes.setHeader).toHaveBeenCalledWith(
+      'X-Privacy-Policy',
+      'https://meuimovel.com.br/privacidade',
+    );
     expect(next).toHaveBeenCalled();
   });
 
-  it('should strip sensitive headers before processing', () => {
-    mockReq.headers['x-cpf'] = '12345678900';
-    middleware.use(mockReq, mockRes, next);
-    expect(mockReq.headers['x-cpf']).toBeUndefined();
-  });
+  it.each(['x-cpf', 'x-rg', 'x-cnpj', 'x-phone'])(
+    'should strip sensitive header %s before processing',
+    (header) => {
+      mockReq.headers[header] = 'some-value';
+      middleware.use(mockReq, mockRes, next);
+      expect(mockReq.headers[header]).toBeUndefined();
+    },
+  );
 });
