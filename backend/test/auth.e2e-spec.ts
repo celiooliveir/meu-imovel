@@ -54,6 +54,7 @@ describe('Auth (e2e)', () => {
       .expect(200);
 
     expect(res.body.accessToken).toBeDefined();
+    expect(res.body.refreshToken).toBeDefined();
     accessToken = res.body.accessToken;
   });
 
