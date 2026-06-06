@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "Meu Imóvel",
+    "slug": "meu-imovel",
+    "scheme": "meu-imovel",
+    "version": "1.0.0",
+    "platforms": ["android"],
+    "android": {
+      "package": "br.com.meuimovel.app",
+      "adaptiveIcon": { "backgroundColor": "#1a56db" }
+    },
+    "plugins": ["expo-router"]
+  }
+}
