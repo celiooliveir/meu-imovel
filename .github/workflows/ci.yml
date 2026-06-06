@@ -21,10 +21,10 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U meu_imovel -d meu_imovel_test"
           --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
+          --health-timeout 10s
+          --health-retries 10
 
     steps:
       - uses: actions/checkout@v4
@@ -66,6 +66,10 @@ jobs:
 
       - name: Install
         run: npm ci --legacy-peer-deps
+        working-directory: mobile
+
+      - name: Generate Expo env types
+        run: echo '/// <reference types="expo/types/env.d" />' > expo-env.d.ts
         working-directory: mobile
 
       - name: TypeScript check
