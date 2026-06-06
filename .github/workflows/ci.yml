@@ -47,9 +47,9 @@ jobs:
         working-directory: backend
         env:
           DATABASE_URL: postgresql://meu_imovel:password@localhost:5432/meu_imovel_test
-          JWT_SECRET: ci-secret-placeholder-min-64-chars-aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          JWT_SECRET: ci-secret-placeholder-min-64-chars-aaaaaaaaaaaaaaaaaaaaaaaaaaaaa
           JWT_EXPIRES_IN: 15m
-          JWT_REFRESH_SECRET: ci-refresh-placeholder-min-64-chars-bbbbbbbbbbbbbbbbbbbbbbbb
+          JWT_REFRESH_SECRET: ci-refresh-placeholder-min-64-chars-bbbbbbbbbbbbbbbbbbbbbbbbbbbbb
           JWT_REFRESH_EXPIRES_IN: 30d
           NODE_ENV: test
 
