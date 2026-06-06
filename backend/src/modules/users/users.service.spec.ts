@@ -47,6 +47,11 @@ describe('UsersService', () => {
         role: UserRole.BUYER_TENANT,
       });
 
+      expect(mockRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          passwordHash: expect.stringMatching(/^\$2b\$12\$/),
+        }),
+      );
       expect(mockRepo.save).toHaveBeenCalled();
       expect(result.email).toBe('joao@email.com');
     });

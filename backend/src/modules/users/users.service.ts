@@ -34,13 +34,14 @@ export class UsersService {
   }
 
   async findByEmail(email: string, withPassword = false): Promise<User | null> {
-    return this.usersRepo.findOne({
-      where: { email },
-      select: withPassword
-        ? ['id', 'email', 'name', 'role', 'passwordHash', 'kycStatus', 'refreshToken',
-           'phone', 'avatarUrl', 'createdAt', 'updatedAt', 'deletedAt']
-        : undefined,
-    });
+    if (withPassword) {
+      return this.usersRepo.findOne({
+        where: { email },
+        select: ['id', 'email', 'name', 'role', 'passwordHash', 'kycStatus', 'refreshToken',
+                 'phone', 'avatarUrl', 'createdAt', 'updatedAt', 'deletedAt'],
+      });
+    }
+    return this.usersRepo.findOneBy({ email });
   }
 
   async updateRefreshToken(id: string, token: string | null): Promise<void> {
