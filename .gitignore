@@ -2,4 +2,11 @@ backend/node_modules
 backend/dist
 mobile/node_modules
 .env
+backend/.env
+backend/.env.local
+backend/.env.*.local
+backend/coverage/
 .superpowers/
+*.log
+.DS_Store
+Thumbs.db
