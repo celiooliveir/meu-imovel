@@ -1,0 +1,13 @@
+version: '3.9'
+
+services:
+  postgres-test:
+    image: postgis/postgis:15-3.4
+    environment:
+      POSTGRES_USER: meu_imovel
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: meu_imovel_test
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
