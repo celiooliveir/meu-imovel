@@ -42,6 +42,9 @@ jobs:
         run: npx jest --no-coverage --passWithNoTests
         working-directory: backend
 
+      - name: Reset E2E database
+        run: PGPASSWORD=password psql -h localhost -U meu_imovel -d meu_imovel_test -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+
       - name: E2E tests
         run: npx jest --config test/jest-e2e.json --no-coverage --forceExit
         working-directory: backend
