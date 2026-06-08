@@ -1,14 +1,24 @@
 import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
-import { AppModule } from '../src/app.module';
 import { DataSource } from 'typeorm';
+import { AppModule } from '../src/app.module';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication;
-  let dataSource: DataSource;
 
   beforeAll(async () => {
+    // Drop and recreate public schema before bootstrapping so TypeORM
+    // synchronize never hits "already exists" errors for enums or tables.
+    const tempDs = new DataSource({
+      type: 'postgres',
+      url: process.env.DATABASE_URL,
+    });
+    await tempDs.initialize();
+    await tempDs.query('DROP SCHEMA public CASCADE');
+    await tempDs.query('CREATE SCHEMA public');
+    await tempDs.destroy();
+
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -17,11 +27,9 @@ describe('Auth (e2e)', () => {
     app.setGlobalPrefix('api/v1');
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
-    dataSource = app.get(DataSource);
   });
 
   afterAll(async () => {
-    await dataSource.query('TRUNCATE TABLE users CASCADE');
     await app.close();
   });
 

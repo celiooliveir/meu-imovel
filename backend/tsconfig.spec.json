@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "resolvePackageJsonExports": false,
     "types": ["jest", "node"]
   },
   "include": ["src/**/*.spec.ts", "src/**/*.e2e-spec.ts", "test/**/*.ts"]
