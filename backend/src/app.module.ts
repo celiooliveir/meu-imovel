@@ -3,6 +3,7 @@ import type { NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './shared/database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { PropertyModule } from './modules/properties/property.module';
 import { LgpdMiddleware } from './shared/middleware/lgpd.middleware';
 
 @Module({
@@ -10,6 +11,7 @@ import { LgpdMiddleware } from './shared/middleware/lgpd.middleware';
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
     AuthModule,
+    PropertyModule,
   ],
 })
 export class AppModule implements NestModule {

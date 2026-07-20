@@ -1,0 +1,77 @@
+import { Entity, Column, Index, ManyToOne, JoinColumn } from 'typeorm';
+import { BaseEntity } from '../../shared/database/base.entity';
+import { User } from '../users/user.entity';
+
+export enum PropertyType {
+  APARTMENT = 'apartment',
+  HOUSE = 'house',
+  COMMERCIAL = 'commercial',
+  LAND = 'land',
+}
+
+export enum TransactionType {
+  SALE = 'sale',
+  RENT = 'rent',
+}
+
+const decimalTransformer = {
+  to: (value?: number | null) => value,
+  from: (value?: string | null) => (value === null || value === undefined ? value : parseFloat(value)),
+};
+
+@Entity('properties')
+export class Property extends BaseEntity {
+  @Column()
+  title: string;
+
+  @Column('text')
+  description: string;
+
+  @Index()
+  @Column({ type: 'enum', enum: PropertyType })
+  type: PropertyType;
+
+  @Column({ type: 'enum', enum: TransactionType })
+  transactionType: TransactionType;
+
+  @Column('decimal', { precision: 12, scale: 2, transformer: decimalTransformer })
+  price: number;
+
+  @Column({ type: 'int', nullable: true })
+  bedrooms: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  bathrooms: number | null;
+
+  @Column('decimal', { precision: 10, scale: 2, nullable: true, transformer: decimalTransformer })
+  areaM2: number | null;
+
+  @Column()
+  street: string;
+
+  @Column()
+  number: string;
+
+  @Column()
+  neighborhood: string;
+
+  @Index()
+  @Column()
+  city: string;
+
+  @Column({ type: 'varchar', length: 2 })
+  state: string;
+
+  @Column()
+  zipCode: string;
+
+  @Column({ default: true })
+  isActive: boolean;
+
+  @Column({ type: 'uuid' })
+  ownerId: string;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'ownerId' })
+  owner: User;
+}
