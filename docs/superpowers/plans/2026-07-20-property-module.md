@@ -15,7 +15,7 @@
 - Scope is CRUD + text/filter search only. No photos, no PostGIS/geosearch, no favorites, no mobile create/edit screen, no draft/sold/rented status workflow (`isActive: boolean` only) — all explicitly deferred per `docs/superpowers/specs/2026-07-20-property-module-design.md`.
 - Pagination is offset-based (`page`/`limit`, default 20, max 50).
 - Follow existing module conventions exactly: `entity.ts` co-locates its enums (see `user.entity.ts`), DTOs use `class-validator` decorators, response DTOs use a static `fromEntity()` mapper (see `UserResponseDto`), error messages are Portuguese strings (see `'Credenciais inválidas'`, `'E-mail já cadastrado'`).
-- No unit-test files are introduced — this repo has zero `*.spec.ts` precedent; all backend behavior (including filter/ownership logic) is covered by `test/property.e2e-spec.ts`, consistent with `test/auth.e2e-spec.ts`.
+- Backend behavior is covered at two levels, matching the existing precedent found in `src/modules/auth/auth.service.spec.ts`, `src/modules/users/users.service.spec.ts`, and `src/shared/middleware/lgpd.middleware.spec.ts`: unit tests mock the TypeORM repository via `getRepositoryToken(Entity)` (services) or construct the class directly with mocked collaborators (guards/middleware) and live next to the source file as `*.spec.ts`; `test/property.e2e-spec.ts` (matching `test/auth.e2e-spec.ts`) covers the full HTTP/DB integration, including authorization end-to-end. Every task that adds service or guard logic adds/extends both.
 - `backend/test/jest-e2e.json` already forces `maxWorkers: 1` — the new e2e spec file runs serially with `auth.e2e-spec.ts` automatically, no config changes needed.
 - Mobile has no test runner beyond `tsc --noEmit` (see `.github/workflows/ci.yml`) — verification for mobile tasks is `npx tsc --noEmit` passing cleanly, plus the code following `mobile/AGENTS.md`'s instruction to match current Expo Router (~56) APIs.
 
@@ -26,10 +26,12 @@
 **Files:**
 - Create: `backend/src/shared/decorators/roles.decorator.ts`
 - Create: `backend/src/shared/guards/roles.guard.ts`
+- Create: `backend/src/shared/guards/roles.guard.spec.ts`
 - Create: `backend/src/modules/properties/property.entity.ts`
 - Create: `backend/src/modules/properties/dto/create-property.dto.ts`
 - Create: `backend/src/modules/properties/dto/property-response.dto.ts`
 - Create: `backend/src/modules/properties/property.service.ts`
+- Create: `backend/src/modules/properties/property.service.spec.ts`
 - Create: `backend/src/modules/properties/property.controller.ts`
 - Create: `backend/src/modules/properties/property.module.ts`
 - Modify: `backend/src/app.module.ts`
@@ -37,6 +39,7 @@
 
 **Interfaces:**
 - Produces: `Property` entity (`backend/src/modules/properties/property.entity.ts`) with `PropertyType` enum (`apartment`, `house`, `commercial`, `land`) and `TransactionType` enum (`sale`, `rent`); `PropertyService.create(dto: CreatePropertyDto, ownerId: string): Promise<Property>`; `PropertyResponseDto.fromEntity(property: Property): PropertyResponseDto`; `Roles(...roles: UserRole[])` decorator and `RolesGuard` — both reused unmodified by Tasks 2 and 3.
+- Unit tests follow the repo's existing convention (see `src/modules/users/users.service.spec.ts` and `src/shared/middleware/lgpd.middleware.spec.ts`): `property.service.spec.ts` mocks the repository via `getRepositoryToken(Property)`; `roles.guard.spec.ts` constructs `RolesGuard` directly with a mocked `Reflector`.
 
 - [ ] **Step 1: Write the failing e2e test file**
 
@@ -516,19 +519,129 @@ export class AppModule implements NestModule {
 }
 ```
 
-- [ ] **Step 12: Run the test to verify it passes**
+- [ ] **Step 12: Run the e2e test to verify it passes**
 
 ```bash
 cd backend
 DATABASE_URL=postgresql://meu_imovel:password@localhost:5432/meu_imovel_test JWT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx JWT_EXPIRES_IN=15m JWT_REFRESH_SECRET=yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy JWT_REFRESH_EXPIRES_IN=30d NODE_ENV=test npx jest --config test/jest-e2e.json --no-coverage --forceExit -t "Properties"
 ```
 
-Expected: PASS — all 4 tests green.
+Expected: PASS — all 5 tests green (owner create, broker create, tenant 403, no-token 401, invalid-body 400).
 
-- [ ] **Step 13: Commit**
+- [ ] **Step 13: Write the roles guard unit test**
+
+Create `backend/src/shared/guards/roles.guard.spec.ts`, following the mocked-collaborator pattern from `src/shared/middleware/lgpd.middleware.spec.ts`:
+
+```ts
+import { ExecutionContext } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { RolesGuard } from './roles.guard';
+import { UserRole } from '../../modules/users/user.entity';
+
+describe('RolesGuard', () => {
+  let guard: RolesGuard;
+  const mockReflector = { getAllAndOverride: jest.fn() };
+
+  beforeEach(() => {
+    guard = new RolesGuard(mockReflector as unknown as Reflector);
+    jest.clearAllMocks();
+  });
+
+  const buildContext = (user?: { role: UserRole }): ExecutionContext =>
+    ({
+      getHandler: () => ({}),
+      getClass: () => ({}),
+      switchToHttp: () => ({ getRequest: () => ({ user }) }),
+    }) as unknown as ExecutionContext;
+
+  it('should allow access when no roles are required', () => {
+    mockReflector.getAllAndOverride.mockReturnValue(undefined);
+    expect(guard.canActivate(buildContext({ role: UserRole.BUYER_TENANT }))).toBe(true);
+  });
+
+  it('should allow access when the user has a required role', () => {
+    mockReflector.getAllAndOverride.mockReturnValue([UserRole.OWNER, UserRole.BROKER]);
+    expect(guard.canActivate(buildContext({ role: UserRole.OWNER }))).toBe(true);
+  });
+
+  it('should deny access when the user does not have a required role', () => {
+    mockReflector.getAllAndOverride.mockReturnValue([UserRole.OWNER, UserRole.BROKER]);
+    expect(guard.canActivate(buildContext({ role: UserRole.BUYER_TENANT }))).toBe(false);
+  });
+});
+```
+
+- [ ] **Step 14: Write the property service unit test (create only)**
+
+Create `backend/src/modules/properties/property.service.spec.ts`, following the mocked-repository pattern from `src/modules/users/users.service.spec.ts`:
+
+```ts
+import { Test } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { PropertyService } from './property.service';
+import { Property, PropertyType, TransactionType } from './property.entity';
+import { CreatePropertyDto } from './dto/create-property.dto';
+
+describe('PropertyService', () => {
+  let service: PropertyService;
+  const mockRepo = {
+    create: jest.fn(),
+    save: jest.fn(),
+  };
+
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      providers: [
+        PropertyService,
+        { provide: getRepositoryToken(Property), useValue: mockRepo },
+      ],
+    }).compile();
+    service = module.get(PropertyService);
+    jest.clearAllMocks();
+  });
+
+  describe('create', () => {
+    it('should attach ownerId and save the property', async () => {
+      const dto: CreatePropertyDto = {
+        title: 'Casa térrea',
+        description: 'Descrição com mais de dez caracteres',
+        type: PropertyType.HOUSE,
+        transactionType: TransactionType.SALE,
+        price: 100000,
+        street: 'Rua A',
+        number: '1',
+        neighborhood: 'Centro',
+        city: 'Curitiba',
+        state: 'PR',
+        zipCode: '80000-000',
+      };
+      const created = { ...dto, ownerId: 'owner-1' } as Property;
+      mockRepo.create.mockReturnValue(created);
+      mockRepo.save.mockResolvedValue(created);
+
+      const result = await service.create(dto, 'owner-1');
+
+      expect(mockRepo.create).toHaveBeenCalledWith(expect.objectContaining({ ...dto, ownerId: 'owner-1' }));
+      expect(mockRepo.save).toHaveBeenCalledWith(created);
+      expect(result.ownerId).toBe('owner-1');
+    });
+  });
+});
+```
+
+- [ ] **Step 15: Run the unit tests to verify they pass**
 
 ```bash
-git add backend/src/shared/decorators/roles.decorator.ts backend/src/shared/guards/roles.guard.ts backend/src/modules/properties backend/src/app.module.ts backend/test/property.e2e-spec.ts
+cd backend
+npx jest --no-coverage roles.guard.spec.ts property.service.spec.ts
+```
+
+Expected: PASS — 4 tests green (3 guard + 1 service).
+
+- [ ] **Step 16: Commit**
+
+```bash
+git add backend/src/shared/decorators/roles.decorator.ts backend/src/shared/guards/roles.guard.ts backend/src/shared/guards/roles.guard.spec.ts backend/src/modules/properties backend/src/app.module.ts backend/test/property.e2e-spec.ts
 git commit -m "feat: add property entity, roles guard, and POST /properties"
 ```
 
@@ -539,6 +652,7 @@ git commit -m "feat: add property entity, roles guard, and POST /properties"
 **Files:**
 - Create: `backend/src/modules/properties/dto/search-property-query.dto.ts`
 - Modify: `backend/src/modules/properties/property.service.ts`
+- Modify: `backend/src/modules/properties/property.service.spec.ts`
 - Modify: `backend/src/modules/properties/property.controller.ts`
 - Modify: `backend/test/property.e2e-spec.ts`
 
@@ -1033,7 +1147,7 @@ export class PropertyController {
 }
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [ ] **Step 6: Run the e2e tests to verify they pass**
 
 ```bash
 cd backend
@@ -1042,7 +1156,127 @@ DATABASE_URL=postgresql://meu_imovel:password@localhost:5432/meu_imovel_test JWT
 
 Expected: PASS — all tests green.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Extend the property service unit test with search and findByIdOrThrow**
+
+Overwrite `backend/src/modules/properties/property.service.spec.ts` with the full file (adds a `mockQueryBuilder`, wires it into `mockRepo.createQueryBuilder`, and adds `findByIdOrThrow`/`search` coverage on top of Task 1's `create` test):
+
+```ts
+import { Test } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { NotFoundException } from '@nestjs/common';
+import { PropertyService } from './property.service';
+import { Property, PropertyType, TransactionType } from './property.entity';
+import { CreatePropertyDto } from './dto/create-property.dto';
+import { SearchPropertyQueryDto } from './dto/search-property-query.dto';
+
+describe('PropertyService', () => {
+  let service: PropertyService;
+
+  const mockQueryBuilder = {
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    skip: jest.fn().mockReturnThis(),
+    take: jest.fn().mockReturnThis(),
+    getManyAndCount: jest.fn(),
+  };
+
+  const mockRepo = {
+    create: jest.fn(),
+    save: jest.fn(),
+    findOneBy: jest.fn(),
+    createQueryBuilder: jest.fn(() => mockQueryBuilder),
+  };
+
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      providers: [
+        PropertyService,
+        { provide: getRepositoryToken(Property), useValue: mockRepo },
+      ],
+    }).compile();
+    service = module.get(PropertyService);
+    jest.clearAllMocks();
+    Object.values(mockQueryBuilder).forEach((fn) => {
+      if (fn !== mockQueryBuilder.getManyAndCount) fn.mockReturnThis();
+    });
+  });
+
+  describe('create', () => {
+    it('should attach ownerId and save the property', async () => {
+      const dto: CreatePropertyDto = {
+        title: 'Casa térrea',
+        description: 'Descrição com mais de dez caracteres',
+        type: PropertyType.HOUSE,
+        transactionType: TransactionType.SALE,
+        price: 100000,
+        street: 'Rua A',
+        number: '1',
+        neighborhood: 'Centro',
+        city: 'Curitiba',
+        state: 'PR',
+        zipCode: '80000-000',
+      };
+      const created = { ...dto, ownerId: 'owner-1' } as Property;
+      mockRepo.create.mockReturnValue(created);
+      mockRepo.save.mockResolvedValue(created);
+
+      const result = await service.create(dto, 'owner-1');
+
+      expect(mockRepo.create).toHaveBeenCalledWith(expect.objectContaining({ ...dto, ownerId: 'owner-1' }));
+      expect(mockRepo.save).toHaveBeenCalledWith(created);
+      expect(result.ownerId).toBe('owner-1');
+    });
+  });
+
+  describe('findByIdOrThrow', () => {
+    it('should return the property when found', async () => {
+      mockRepo.findOneBy.mockResolvedValue({ id: 'prop-1' } as Property);
+      const result = await service.findByIdOrThrow('prop-1');
+      expect(result.id).toBe('prop-1');
+    });
+
+    it('should throw NotFoundException when not found', async () => {
+      mockRepo.findOneBy.mockResolvedValue(null);
+      await expect(service.findByIdOrThrow('missing')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('search', () => {
+    it('should apply filters and return paginated results', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[{ id: 'prop-1' } as Property], 1]);
+
+      const query: SearchPropertyQueryDto = { city: 'São Paulo', page: 2, limit: 10 };
+      const result = await service.search(query);
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('property.city ILIKE :city', { city: 'São Paulo' });
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(10);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
+      expect(result).toEqual({ items: [{ id: 'prop-1' }], total: 1, page: 2, limit: 10 });
+    });
+
+    it('should default to page 1 and limit 20 when not provided', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.search({});
+
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(20);
+    });
+  });
+});
+```
+
+- [ ] **Step 8: Run the unit tests to verify they pass**
+
+```bash
+cd backend
+npx jest --no-coverage property.service.spec.ts
+```
+
+Expected: PASS — 5 tests green (1 create + 2 findByIdOrThrow + 2 search).
+
+- [ ] **Step 9: Commit**
 
 ```bash
 git add backend/src/modules/properties backend/test/property.e2e-spec.ts
@@ -1056,6 +1290,7 @@ git commit -m "feat: add property search and detail endpoints"
 **Files:**
 - Create: `backend/src/modules/properties/dto/update-property.dto.ts`
 - Modify: `backend/src/modules/properties/property.service.ts`
+- Modify: `backend/src/modules/properties/property.service.spec.ts`
 - Modify: `backend/src/modules/properties/property.controller.ts`
 - Modify: `backend/test/property.e2e-spec.ts`
 
@@ -1410,7 +1645,167 @@ DATABASE_URL=postgresql://meu_imovel:password@localhost:5432/meu_imovel_test JWT
 
 Expected: PASS — both `test/auth.e2e-spec.ts` and `test/property.e2e-spec.ts` fully green.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Extend the property service unit test with update and remove**
+
+Overwrite `backend/src/modules/properties/property.service.spec.ts` with the full file (adds `ForbiddenException` import, `softRemove` to `mockRepo`, and `update`/`remove` coverage on top of Tasks 1–2's tests):
+
+```ts
+import { Test } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { PropertyService } from './property.service';
+import { Property, PropertyType, TransactionType } from './property.entity';
+import { CreatePropertyDto } from './dto/create-property.dto';
+import { SearchPropertyQueryDto } from './dto/search-property-query.dto';
+
+describe('PropertyService', () => {
+  let service: PropertyService;
+
+  const mockQueryBuilder = {
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    skip: jest.fn().mockReturnThis(),
+    take: jest.fn().mockReturnThis(),
+    getManyAndCount: jest.fn(),
+  };
+
+  const mockRepo = {
+    create: jest.fn(),
+    save: jest.fn(),
+    findOneBy: jest.fn(),
+    softRemove: jest.fn(),
+    createQueryBuilder: jest.fn(() => mockQueryBuilder),
+  };
+
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      providers: [
+        PropertyService,
+        { provide: getRepositoryToken(Property), useValue: mockRepo },
+      ],
+    }).compile();
+    service = module.get(PropertyService);
+    jest.clearAllMocks();
+    Object.values(mockQueryBuilder).forEach((fn) => {
+      if (fn !== mockQueryBuilder.getManyAndCount) fn.mockReturnThis();
+    });
+  });
+
+  describe('create', () => {
+    it('should attach ownerId and save the property', async () => {
+      const dto: CreatePropertyDto = {
+        title: 'Casa térrea',
+        description: 'Descrição com mais de dez caracteres',
+        type: PropertyType.HOUSE,
+        transactionType: TransactionType.SALE,
+        price: 100000,
+        street: 'Rua A',
+        number: '1',
+        neighborhood: 'Centro',
+        city: 'Curitiba',
+        state: 'PR',
+        zipCode: '80000-000',
+      };
+      const created = { ...dto, ownerId: 'owner-1' } as Property;
+      mockRepo.create.mockReturnValue(created);
+      mockRepo.save.mockResolvedValue(created);
+
+      const result = await service.create(dto, 'owner-1');
+
+      expect(mockRepo.create).toHaveBeenCalledWith(expect.objectContaining({ ...dto, ownerId: 'owner-1' }));
+      expect(mockRepo.save).toHaveBeenCalledWith(created);
+      expect(result.ownerId).toBe('owner-1');
+    });
+  });
+
+  describe('findByIdOrThrow', () => {
+    it('should return the property when found', async () => {
+      mockRepo.findOneBy.mockResolvedValue({ id: 'prop-1' } as Property);
+      const result = await service.findByIdOrThrow('prop-1');
+      expect(result.id).toBe('prop-1');
+    });
+
+    it('should throw NotFoundException when not found', async () => {
+      mockRepo.findOneBy.mockResolvedValue(null);
+      await expect(service.findByIdOrThrow('missing')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('search', () => {
+    it('should apply filters and return paginated results', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[{ id: 'prop-1' } as Property], 1]);
+
+      const query: SearchPropertyQueryDto = { city: 'São Paulo', page: 2, limit: 10 };
+      const result = await service.search(query);
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('property.city ILIKE :city', { city: 'São Paulo' });
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(10);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
+      expect(result).toEqual({ items: [{ id: 'prop-1' }], total: 1, page: 2, limit: 10 });
+    });
+
+    it('should default to page 1 and limit 20 when not provided', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.search({});
+
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(20);
+    });
+  });
+
+  describe('update', () => {
+    it('should update and save when the requester owns the property', async () => {
+      const existing = { id: 'prop-1', ownerId: 'owner-1', price: 100 } as Property;
+      mockRepo.findOneBy.mockResolvedValue(existing);
+      mockRepo.save.mockImplementation((p) => Promise.resolve(p));
+
+      const result = await service.update('prop-1', 'owner-1', { price: 200 });
+
+      expect(result.price).toBe(200);
+      expect(mockRepo.save).toHaveBeenCalledWith(expect.objectContaining({ id: 'prop-1', price: 200 }));
+    });
+
+    it('should throw ForbiddenException when the requester does not own the property', async () => {
+      mockRepo.findOneBy.mockResolvedValue({ id: 'prop-1', ownerId: 'owner-1' } as Property);
+
+      await expect(service.update('prop-1', 'owner-2', { price: 200 })).rejects.toThrow(ForbiddenException);
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('remove', () => {
+    it('should soft-remove when the requester owns the property', async () => {
+      const existing = { id: 'prop-1', ownerId: 'owner-1' } as Property;
+      mockRepo.findOneBy.mockResolvedValue(existing);
+      mockRepo.softRemove.mockResolvedValue(existing);
+
+      await service.remove('prop-1', 'owner-1');
+
+      expect(mockRepo.softRemove).toHaveBeenCalledWith(existing);
+    });
+
+    it('should throw ForbiddenException when the requester does not own the property', async () => {
+      mockRepo.findOneBy.mockResolvedValue({ id: 'prop-1', ownerId: 'owner-1' } as Property);
+
+      await expect(service.remove('prop-1', 'owner-2')).rejects.toThrow(ForbiddenException);
+      expect(mockRepo.softRemove).not.toHaveBeenCalled();
+    });
+  });
+});
+```
+
+- [ ] **Step 8: Run the unit tests to verify they pass**
+
+```bash
+cd backend
+npx jest --no-coverage property.service.spec.ts
+```
+
+Expected: PASS — 9 tests green (1 create + 2 findByIdOrThrow + 2 search + 2 update + 2 remove).
+
+- [ ] **Step 9: Commit**
 
 ```bash
 git add backend/src/modules/properties backend/test/property.e2e-spec.ts
