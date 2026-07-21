@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Button } from '../../components/ui/Button';
@@ -17,20 +17,27 @@ export default function MyListingsScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async (targetPage: number, replace: boolean) => {
+    const requestId = ++requestIdRef.current;
     if (replace) setLoading(true);
     else setLoadingMore(true);
     try {
       const { data } = await propertyApi.getMine(targetPage);
+      if (requestId !== requestIdRef.current) return;
       setItems((prev) => (replace ? data.items : [...prev, ...data.items]));
       setPage(data.page);
       setHasMore(data.page * data.limit < data.total);
     } catch {
-      Alert.alert('Erro', 'Não foi possível carregar seus anúncios');
+      if (requestId === requestIdRef.current) {
+        Alert.alert('Erro', 'Não foi possível carregar seus anúncios');
+      }
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   }, []);
 
