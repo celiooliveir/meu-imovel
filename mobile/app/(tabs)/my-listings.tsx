@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Button } from '../../components/ui/Button';
 import { propertyApi, Property } from '../../services/properties';
@@ -14,23 +14,40 @@ function formatPrice(price: number, transactionType: string) {
 export default function MyListingsScreen() {
   const [items, setItems] = useState<Property[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(1);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (targetPage: number, replace: boolean) => {
+    if (replace) setLoading(true);
+    else setLoadingMore(true);
     try {
-      const { data } = await propertyApi.getMine();
-      setItems(data.items);
+      const { data } = await propertyApi.getMine(targetPage);
+      setItems((prev) => (replace ? data.items : [...prev, ...data.items]));
+      setPage(data.page);
+      setHasMore(data.page * data.limit < data.total);
     } catch {
       Alert.alert('Erro', 'Não foi possível carregar seus anúncios');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, []);
 
+  const refresh = useCallback(() => {
+    setHasMore(true);
+    load(1, true);
+  }, [load]);
+
+  const loadMore = useCallback(() => {
+    if (loading || loadingMore || !hasMore) return;
+    load(page + 1, false);
+  }, [loading, loadingMore, hasMore, page, load]);
+
   useFocusEffect(
     useCallback(() => {
-      load();
-    }, [load]),
+      refresh();
+    }, [refresh]),
   );
 
   return (
@@ -41,9 +58,12 @@ export default function MyListingsScreen() {
         data={items}
         keyExtractor={(item) => item.id}
         style={styles.list}
-        onRefresh={load}
+        onRefresh={refresh}
         refreshing={loading}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
         ListEmptyComponent={!loading ? <Text style={styles.empty}>Você ainda não tem anúncios</Text> : null}
+        ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.footerLoader} color="#1a56db" /> : null}
         renderItem={({ item }) => (
           <TouchableOpacity
             style={[styles.card, !item.isActive && styles.cardInactive]}
@@ -65,6 +85,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '700', color: '#111827', marginBottom: 16 },
   list: { marginTop: 16 },
   empty: { textAlign: 'center', color: '#6b7280', marginTop: 32 },
+  footerLoader: { marginVertical: 16 },
   card: {
     padding: 16, borderRadius: 12, borderWidth: 1.5, borderColor: '#e5e7eb', marginBottom: 12,
   },
