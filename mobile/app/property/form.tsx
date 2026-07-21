@@ -47,6 +47,7 @@ export default function PropertyForm() {
   const [saving, setSaving] = useState(false);
   const [loadingProperty, setLoadingProperty] = useState(isEditing);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [lastCheckedZip, setLastCheckedZip] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -67,6 +68,7 @@ export default function PropertyForm() {
         setCity(data.city);
         setState(data.state);
         setZipCode(data.zipCode);
+        setLastCheckedZip(data.zipCode.replace(/\D/g, ''));
         setIsActive(data.isActive);
       })
       .catch(() => Alert.alert('Erro', 'Não foi possível carregar o imóvel'))
@@ -76,6 +78,7 @@ export default function PropertyForm() {
   const handleZipCodeBlur = async () => {
     const digits = zipCode.replace(/\D/g, '');
     if (digits.length !== 8) return;
+    if (digits === lastCheckedZip) return;
     try {
       const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
       const data: ViaCepResponse = await res.json();
@@ -86,6 +89,8 @@ export default function PropertyForm() {
       if (data.uf) setState(data.uf);
     } catch {
       // CEP inválido ou API fora do ar: segue com preenchimento manual
+    } finally {
+      setLastCheckedZip(digits);
     }
   };
 
