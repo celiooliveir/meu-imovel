@@ -46,6 +46,7 @@ export default function PropertyForm() {
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadingProperty, setLoadingProperty] = useState(isEditing);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -106,9 +107,36 @@ export default function PropertyForm() {
   });
 
   const handleSubmit = async () => {
+    setErrors({});
+
     if (!title || !description || !price || !street || !number || !neighborhood || !city || !state || !zipCode) {
       return;
     }
+
+    const newErrors: Record<string, string> = {};
+
+    if (title.length < 3) {
+      newErrors.title = 'Título deve ter no mínimo 3 caracteres';
+    }
+    if (description.length < 10) {
+      newErrors.description = 'Descrição deve ter no mínimo 10 caracteres';
+    }
+    const parsedPrice = Number(price);
+    if (!price || Number.isNaN(parsedPrice) || parsedPrice < 0) {
+      newErrors.price = 'Preço inválido';
+    }
+    if (!/^\d{5}-?\d{3}$/.test(zipCode)) {
+      newErrors.zipCode = 'CEP deve estar no formato 00000-000';
+    }
+    if (state.length !== 2) {
+      newErrors.state = 'Estado deve ter 2 letras (UF)';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
     setSaving(true);
     try {
       if (isEditing && id) {
@@ -155,8 +183,14 @@ export default function PropertyForm() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>{isEditing ? 'Editar anúncio' : 'Novo anúncio'}</Text>
 
-      <Input label="Título" value={title} onChangeText={setTitle} />
-      <Input label="Descrição" value={description} onChangeText={setDescription} multiline />
+      <Input label="Título" value={title} onChangeText={setTitle} error={errors.title} />
+      <Input
+        label="Descrição"
+        value={description}
+        onChangeText={setDescription}
+        multiline
+        error={errors.description}
+      />
 
       <Text style={styles.sectionLabel}>Tipo</Text>
       <View style={styles.optionsRow}>
@@ -186,7 +220,7 @@ export default function PropertyForm() {
         ))}
       </View>
 
-      <Input label="Preço" value={price} onChangeText={setPrice} keyboardType="numeric" />
+      <Input label="Preço" value={price} onChangeText={setPrice} keyboardType="numeric" error={errors.price} />
       <Input label="Quartos" value={bedrooms} onChangeText={setBedrooms} keyboardType="numeric" />
       <Input label="Banheiros" value={bathrooms} onChangeText={setBathrooms} keyboardType="numeric" />
       <Input label="Área (m²)" value={areaM2} onChangeText={setAreaM2} keyboardType="numeric" />
@@ -197,12 +231,20 @@ export default function PropertyForm() {
         onBlur={handleZipCodeBlur}
         keyboardType="numeric"
         placeholder="00000-000"
+        error={errors.zipCode}
       />
       <Input label="Rua" value={street} onChangeText={setStreet} />
       <Input label="Número" value={number} onChangeText={setNumber} />
       <Input label="Bairro" value={neighborhood} onChangeText={setNeighborhood} />
       <Input label="Cidade" value={city} onChangeText={setCity} />
-      <Input label="Estado (UF)" value={state} onChangeText={setState} maxLength={2} autoCapitalize="characters" />
+      <Input
+        label="Estado (UF)"
+        value={state}
+        onChangeText={setState}
+        maxLength={2}
+        autoCapitalize="characters"
+        error={errors.state}
+      />
 
       {isEditing ? (
         <View style={styles.switchRow}>
