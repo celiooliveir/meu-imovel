@@ -8,12 +8,14 @@ describe('Properties (e2e)', () => {
   let app: INestApplication;
   let ownerToken: string;
   let brokerToken: string;
+  let ownerBToken: string;
   let tenantToken: string;
 
   let spFlatId: string;
   let spHouseId: string;
   let rioFlatId: string;
   let curitibaLandId: string;
+  let mutableId: string;
 
   beforeAll(async () => {
     const tempDs = new DataSource({
@@ -48,6 +50,11 @@ describe('Properties (e2e)', () => {
       .post('/api/v1/auth/register')
       .send({ name: 'Bruno Tenant', email: 'bruno.tenant@teste.com', password: 'senha1234', role: 'buyer_tenant' });
     tenantToken = tenantRes.body.accessToken;
+
+    const ownerBRes = await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({ name: 'Carla OwnerB', email: 'carla.ownerb@teste.com', password: 'senha1234', role: 'owner' });
+    ownerBToken = ownerBRes.body.accessToken;
 
     const createAsOwner = (body: Record<string, unknown>) =>
       request(app.getHttpServer())
@@ -123,6 +130,21 @@ describe('Properties (e2e)', () => {
       zipCode: '82015-000',
     });
     curitibaLandId = curitibaLand.body.id;
+
+    const mutableProperty = await createAsOwner({
+      title: 'Loja comercial no centro histórico',
+      description: 'Loja comercial térrea, ampla vitrine, ótimo fluxo de pessoas.',
+      type: 'commercial',
+      transactionType: 'rent',
+      price: 5000,
+      street: 'Rua XV de Novembro',
+      number: '300',
+      neighborhood: 'Centro Histórico',
+      city: 'Salvador',
+      state: 'BA',
+      zipCode: '40010-000',
+    });
+    mutableId = mutableProperty.body.id;
   });
 
   afterAll(async () => {
@@ -297,5 +319,50 @@ describe('Properties (e2e)', () => {
       .get('/api/v1/properties/not-a-uuid')
       .set('Authorization', `Bearer ${tenantToken}`)
       .expect(400);
+  });
+
+  it('PATCH /api/v1/properties/:id — dono edita com sucesso', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/api/v1/properties/${mutableId}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ price: 5500 })
+      .expect(200);
+
+    expect(res.body.price).toBe(5500);
+  });
+
+  it('PATCH /api/v1/properties/:id — outro owner recebe 403', async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/properties/${mutableId}`)
+      .set('Authorization', `Bearer ${ownerBToken}`)
+      .send({ price: 6000 })
+      .expect(403);
+  });
+
+  it('PATCH /api/v1/properties/:id — buyer_tenant recebe 403', async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/properties/${mutableId}`)
+      .set('Authorization', `Bearer ${tenantToken}`)
+      .send({ price: 6000 })
+      .expect(403);
+  });
+
+  it('DELETE /api/v1/properties/:id — outro owner recebe 403', async () => {
+    await request(app.getHttpServer())
+      .delete(`/api/v1/properties/${mutableId}`)
+      .set('Authorization', `Bearer ${ownerBToken}`)
+      .expect(403);
+  });
+
+  it('DELETE /api/v1/properties/:id — dono exclui com sucesso', async () => {
+    await request(app.getHttpServer())
+      .delete(`/api/v1/properties/${mutableId}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/properties/${mutableId}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(404);
   });
 });

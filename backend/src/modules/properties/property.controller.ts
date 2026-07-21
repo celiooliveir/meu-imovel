@@ -1,9 +1,11 @@
 import {
-  Controller, Post, Get, Param, Query, Body, UseGuards, HttpCode, HttpStatus, ParseUUIDPipe,
+  Controller, Post, Get, Patch, Delete, Param, Query, Body,
+  UseGuards, HttpCode, HttpStatus, ParseUUIDPipe,
 } from '@nestjs/common';
 import { PropertyService } from './property.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { SearchPropertyQueryDto } from './dto/search-property-query.dto';
+import { UpdatePropertyDto } from './dto/update-property.dto';
 import { PropertyResponseDto } from './dto/property-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../shared/guards/roles.guard';
@@ -36,5 +38,25 @@ export class PropertyController {
   async findOne(@Param('id', new ParseUUIDPipe()) id: string) {
     const property = await this.propertyService.findByIdOrThrow(id);
     return PropertyResponseDto.fromEntity(property);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER, UserRole.BROKER)
+  async update(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: UpdatePropertyDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    const property = await this.propertyService.update(id, user.id, dto);
+    return PropertyResponseDto.fromEntity(property);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER, UserRole.BROKER)
+  async remove(@Param('id', new ParseUUIDPipe()) id: string, @CurrentUser() user: { id: string }) {
+    await this.propertyService.remove(id, user.id);
   }
 }

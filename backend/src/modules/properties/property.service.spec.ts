@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PropertyService } from './property.service';
 import { Property, PropertyType, TransactionType } from './property.entity';
 import { CreatePropertyDto } from './dto/create-property.dto';
@@ -22,6 +22,7 @@ describe('PropertyService', () => {
     create: jest.fn(),
     save: jest.fn(),
     findOneBy: jest.fn(),
+    softRemove: jest.fn(),
     createQueryBuilder: jest.fn(() => mockQueryBuilder),
   };
 
@@ -99,6 +100,45 @@ describe('PropertyService', () => {
 
       expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
       expect(mockQueryBuilder.take).toHaveBeenCalledWith(20);
+    });
+  });
+
+  describe('update', () => {
+    it('should update and save when the requester owns the property', async () => {
+      const existing = { id: 'prop-1', ownerId: 'owner-1', price: 100 } as Property;
+      mockRepo.findOneBy.mockResolvedValue(existing);
+      mockRepo.save.mockImplementation((p) => Promise.resolve(p));
+
+      const result = await service.update('prop-1', 'owner-1', { price: 200 });
+
+      expect(result.price).toBe(200);
+      expect(mockRepo.save).toHaveBeenCalledWith(expect.objectContaining({ id: 'prop-1', price: 200 }));
+    });
+
+    it('should throw ForbiddenException when the requester does not own the property', async () => {
+      mockRepo.findOneBy.mockResolvedValue({ id: 'prop-1', ownerId: 'owner-1' } as Property);
+
+      await expect(service.update('prop-1', 'owner-2', { price: 200 })).rejects.toThrow(ForbiddenException);
+      expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('remove', () => {
+    it('should soft-remove when the requester owns the property', async () => {
+      const existing = { id: 'prop-1', ownerId: 'owner-1' } as Property;
+      mockRepo.findOneBy.mockResolvedValue(existing);
+      mockRepo.softRemove.mockResolvedValue(existing);
+
+      await service.remove('prop-1', 'owner-1');
+
+      expect(mockRepo.softRemove).toHaveBeenCalledWith(existing);
+    });
+
+    it('should throw ForbiddenException when the requester does not own the property', async () => {
+      mockRepo.findOneBy.mockResolvedValue({ id: 'prop-1', ownerId: 'owner-1' } as Property);
+
+      await expect(service.remove('prop-1', 'owner-2')).rejects.toThrow(ForbiddenException);
+      expect(mockRepo.softRemove).not.toHaveBeenCalled();
     });
   });
 });

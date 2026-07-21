@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Property } from './property.entity';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { SearchPropertyQueryDto } from './dto/search-property-query.dto';
+import { UpdatePropertyDto } from './dto/update-property.dto';
 
 @Injectable()
 export class PropertyService {
@@ -51,5 +52,22 @@ export class PropertyService {
 
     const [items, total] = await qb.getManyAndCount();
     return { items, total, page, limit };
+  }
+
+  async update(id: string, ownerId: string, dto: UpdatePropertyDto): Promise<Property> {
+    const property = await this.findByIdOrThrow(id);
+    if (property.ownerId !== ownerId) {
+      throw new ForbiddenException('Você não pode editar um imóvel de outro usuário');
+    }
+    Object.assign(property, dto);
+    return this.propertyRepo.save(property);
+  }
+
+  async remove(id: string, ownerId: string): Promise<void> {
+    const property = await this.findByIdOrThrow(id);
+    if (property.ownerId !== ownerId) {
+      throw new ForbiddenException('Você não pode excluir um imóvel de outro usuário');
+    }
+    await this.propertyRepo.softRemove(property);
   }
 }
