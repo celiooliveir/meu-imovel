@@ -1,0 +1,79 @@
+import { useCallback, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { Button } from '../../components/ui/Button';
+import { propertyApi, Property } from '../../services/properties';
+
+const TRANSACTION_LABEL: Record<string, string> = { sale: 'Venda', rent: 'Aluguel' };
+
+function formatPrice(price: number, transactionType: string) {
+  const value = price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  return transactionType === 'rent' ? `${value}/mês` : value;
+}
+
+export default function MyListingsScreen() {
+  const [items, setItems] = useState<Property[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await propertyApi.getMine();
+      setItems(data.items);
+    } catch {
+      Alert.alert('Erro', 'Não foi possível carregar seus anúncios');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Meus anúncios</Text>
+      <Button title="+ Novo anúncio" onPress={() => router.push('/property/form')} />
+      <FlatList
+        data={items}
+        keyExtractor={(item) => item.id}
+        style={styles.list}
+        onRefresh={load}
+        refreshing={loading}
+        ListEmptyComponent={!loading ? <Text style={styles.empty}>Você ainda não tem anúncios</Text> : null}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={[styles.card, !item.isActive && styles.cardInactive]}
+            onPress={() => router.push({ pathname: '/property/form', params: { id: item.id } })}
+          >
+            {!item.isActive ? <Text style={styles.badge}>Inativo</Text> : null}
+            <Text style={styles.cardTitle}>{item.title}</Text>
+            <Text style={styles.cardSub}>{item.city} • {TRANSACTION_LABEL[item.transactionType]}</Text>
+            <Text style={styles.cardPrice}>{formatPrice(item.price, item.transactionType)}</Text>
+          </TouchableOpacity>
+        )}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, padding: 24, backgroundColor: '#fff' },
+  title: { fontSize: 20, fontWeight: '700', color: '#111827', marginBottom: 16 },
+  list: { marginTop: 16 },
+  empty: { textAlign: 'center', color: '#6b7280', marginTop: 32 },
+  card: {
+    padding: 16, borderRadius: 12, borderWidth: 1.5, borderColor: '#e5e7eb', marginBottom: 12,
+  },
+  cardInactive: { opacity: 0.6 },
+  badge: {
+    alignSelf: 'flex-start', backgroundColor: '#fee2e2', color: '#b91c1c',
+    fontSize: 11, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginBottom: 6,
+  },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  cardSub: { fontSize: 13, color: '#6b7280', marginTop: 4 },
+  cardPrice: { fontSize: 15, fontWeight: '700', color: '#1a56db', marginTop: 8 },
+});
