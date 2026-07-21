@@ -1,6 +1,9 @@
-import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller, Post, Get, Param, Query, Body, UseGuards, HttpCode, HttpStatus, ParseUUIDPipe,
+} from '@nestjs/common';
 import { PropertyService } from './property.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
+import { SearchPropertyQueryDto } from './dto/search-property-query.dto';
 import { PropertyResponseDto } from './dto/property-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../shared/guards/roles.guard';
@@ -18,6 +21,20 @@ export class PropertyController {
   @Roles(UserRole.OWNER, UserRole.BROKER)
   async create(@Body() dto: CreatePropertyDto, @CurrentUser() user: { id: string }) {
     const property = await this.propertyService.create(dto, user.id);
+    return PropertyResponseDto.fromEntity(property);
+  }
+
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  async search(@Query() query: SearchPropertyQueryDto) {
+    const { items, total, page, limit } = await this.propertyService.search(query);
+    return { items: items.map(PropertyResponseDto.fromEntity), total, page, limit };
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  async findOne(@Param('id', new ParseUUIDPipe()) id: string) {
+    const property = await this.propertyService.findByIdOrThrow(id);
     return PropertyResponseDto.fromEntity(property);
   }
 }

@@ -1,14 +1,28 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { NotFoundException } from '@nestjs/common';
 import { PropertyService } from './property.service';
 import { Property, PropertyType, TransactionType } from './property.entity';
 import { CreatePropertyDto } from './dto/create-property.dto';
+import { SearchPropertyQueryDto } from './dto/search-property-query.dto';
 
 describe('PropertyService', () => {
   let service: PropertyService;
+
+  const mockQueryBuilder = {
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    skip: jest.fn().mockReturnThis(),
+    take: jest.fn().mockReturnThis(),
+    getManyAndCount: jest.fn(),
+  };
+
   const mockRepo = {
     create: jest.fn(),
     save: jest.fn(),
+    findOneBy: jest.fn(),
+    createQueryBuilder: jest.fn(() => mockQueryBuilder),
   };
 
   beforeEach(async () => {
@@ -20,6 +34,9 @@ describe('PropertyService', () => {
     }).compile();
     service = module.get(PropertyService);
     jest.clearAllMocks();
+    Object.values(mockQueryBuilder).forEach((fn) => {
+      if (fn !== mockQueryBuilder.getManyAndCount) fn.mockReturnThis();
+    });
   });
 
   describe('create', () => {
@@ -46,6 +63,42 @@ describe('PropertyService', () => {
       expect(mockRepo.create).toHaveBeenCalledWith(expect.objectContaining({ ...dto, ownerId: 'owner-1' }));
       expect(mockRepo.save).toHaveBeenCalledWith(created);
       expect(result.ownerId).toBe('owner-1');
+    });
+  });
+
+  describe('findByIdOrThrow', () => {
+    it('should return the property when found', async () => {
+      mockRepo.findOneBy.mockResolvedValue({ id: 'prop-1' } as Property);
+      const result = await service.findByIdOrThrow('prop-1');
+      expect(result.id).toBe('prop-1');
+    });
+
+    it('should throw NotFoundException when not found', async () => {
+      mockRepo.findOneBy.mockResolvedValue(null);
+      await expect(service.findByIdOrThrow('missing')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('search', () => {
+    it('should apply filters and return paginated results', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[{ id: 'prop-1' } as Property], 1]);
+
+      const query: SearchPropertyQueryDto = { city: 'São Paulo', page: 2, limit: 10 };
+      const result = await service.search(query);
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('property.city ILIKE :city', { city: 'São Paulo' });
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(10);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
+      expect(result).toEqual({ items: [{ id: 'prop-1' }], total: 1, page: 2, limit: 10 });
+    });
+
+    it('should default to page 1 and limit 20 when not provided', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.search({});
+
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(20);
     });
   });
 });
