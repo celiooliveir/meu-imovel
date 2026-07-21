@@ -54,6 +54,20 @@ export class PropertyService {
     return { items, total, page, limit };
   }
 
+  async findMine(
+    ownerId: string,
+    page: number,
+    limit: number,
+  ): Promise<{ items: Property[]; total: number; page: number; limit: number }> {
+    const [items, total] = await this.propertyRepo.findAndCount({
+      where: { ownerId },
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+    return { items, total, page, limit };
+  }
+
   async update(id: string, ownerId: string, dto: UpdatePropertyDto): Promise<Property> {
     const property = await this.findByIdOrThrow(id);
     if (property.ownerId !== ownerId) {

@@ -22,6 +22,7 @@ describe('PropertyService', () => {
     create: jest.fn(),
     save: jest.fn(),
     findOneBy: jest.fn(),
+    findAndCount: jest.fn(),
     softRemove: jest.fn(),
     createQueryBuilder: jest.fn(() => mockQueryBuilder),
   };
@@ -100,6 +101,32 @@ describe('PropertyService', () => {
 
       expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
       expect(mockQueryBuilder.take).toHaveBeenCalledWith(20);
+    });
+  });
+
+  describe('findMine', () => {
+    it('should return paginated properties owned by the given user', async () => {
+      mockRepo.findAndCount.mockResolvedValue([[{ id: 'prop-1', ownerId: 'owner-1' } as Property], 1]);
+
+      const result = await service.findMine('owner-1', 1, 20);
+
+      expect(mockRepo.findAndCount).toHaveBeenCalledWith({
+        where: { ownerId: 'owner-1' },
+        order: { createdAt: 'DESC' },
+        skip: 0,
+        take: 20,
+      });
+      expect(result).toEqual({ items: [{ id: 'prop-1', ownerId: 'owner-1' }], total: 1, page: 1, limit: 20 });
+    });
+
+    it('should compute skip from page and limit', async () => {
+      mockRepo.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.findMine('owner-1', 3, 10);
+
+      expect(mockRepo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 20, take: 10 }),
+      );
     });
   });
 

@@ -16,6 +16,7 @@ describe('Properties (e2e)', () => {
   let rioFlatId: string;
   let curitibaLandId: string;
   let mutableId: string;
+  let inactivePropertyId: string;
 
   beforeAll(async () => {
     const tempDs = new DataSource({
@@ -145,6 +146,26 @@ describe('Properties (e2e)', () => {
       zipCode: '40010-000',
     });
     mutableId = mutableProperty.body.id;
+
+    const inactiveProperty = await createAsOwner({
+      title: 'Sala comercial fechada temporariamente',
+      description: 'Sala comercial atualmente fora do mercado, aguardando reforma.',
+      type: 'commercial',
+      transactionType: 'rent',
+      price: 3000,
+      street: 'Rua Sete de Setembro',
+      number: '45',
+      neighborhood: 'Centro',
+      city: 'Porto Alegre',
+      state: 'RS',
+      zipCode: '90010-000',
+    });
+    inactivePropertyId = inactiveProperty.body.id;
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/properties/${inactivePropertyId}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ isActive: false });
   });
 
   afterAll(async () => {
@@ -319,6 +340,40 @@ describe('Properties (e2e)', () => {
       .get('/api/v1/properties/not-a-uuid')
       .set('Authorization', `Bearer ${tenantToken}`)
       .expect(400);
+  });
+
+  it('GET /api/v1/properties/mine — retorna os imóveis do dono autenticado, incluindo inativos', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/properties/mine')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+
+    const ids = res.body.items.map((p: { id: string }) => p.id);
+    expect(ids).toEqual(
+      expect.arrayContaining([spFlatId, spHouseId, rioFlatId, curitibaLandId, inactivePropertyId]),
+    );
+  });
+
+  it('GET /api/v1/properties/mine — não retorna imóveis de outro usuário', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/properties/mine')
+      .set('Authorization', `Bearer ${ownerBToken}`)
+      .expect(200);
+
+    const ids = res.body.items.map((p: { id: string }) => p.id);
+    expect(ids).not.toContain(spFlatId);
+    expect(ids).not.toContain(inactivePropertyId);
+  });
+
+  it('GET /api/v1/properties/mine — buyer_tenant recebe 403', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/properties/mine')
+      .set('Authorization', `Bearer ${tenantToken}`)
+      .expect(403);
+  });
+
+  it('GET /api/v1/properties/mine — sem token recebe 401', async () => {
+    await request(app.getHttpServer()).get('/api/v1/properties/mine').expect(401);
   });
 
   it('PATCH /api/v1/properties/:id — dono edita com sucesso', async () => {

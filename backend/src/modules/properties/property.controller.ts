@@ -33,6 +33,18 @@ export class PropertyController {
     return { items: items.map(PropertyResponseDto.fromEntity), total, page, limit };
   }
 
+  @Get('mine')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER, UserRole.BROKER)
+  async findMine(@Query() query: SearchPropertyQueryDto, @CurrentUser() user: { id: string }) {
+    const { items, total, page, limit } = await this.propertyService.findMine(
+      user.id,
+      query.page ?? 1,
+      query.limit ?? 20,
+    );
+    return { items: items.map(PropertyResponseDto.fromEntity), total, page, limit };
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   async findOne(@Param('id', new ParseUUIDPipe()) id: string) {
