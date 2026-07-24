@@ -55,6 +55,10 @@ jobs:
           CLOUDINARY_CLOUD_NAME: ci-placeholder
           CLOUDINARY_API_KEY: ci-placeholder
           CLOUDINARY_API_SECRET: ci-placeholder
+          # file-type (used by NestJS's FileTypeValidator for photo upload) is ESM-only;
+          # Jest's default VM context can't dynamically import it without this flag, and
+          # the validator fails closed (rejects every file) if the import throws.
+          NODE_OPTIONS: --experimental-vm-modules
 
   mobile-typecheck:
     name: Mobile — TypeScript
