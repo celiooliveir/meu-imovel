@@ -5,8 +5,11 @@ import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { CloudinaryService } from '../src/shared/cloudinary/cloudinary.service';
 
-const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-const fakePngBuffer = () => Buffer.concat([PNG_SIGNATURE, Buffer.from('rest-of-fake-png-content')]);
+const VALID_PNG_BUFFER = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+);
+const fakePngBuffer = () => VALID_PNG_BUFFER;
 
 describe('Property Photos (e2e)', () => {
   let app: INestApplication;
