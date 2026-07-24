@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, Image } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { propertyApi, Property } from '../../services/properties';
 
@@ -44,6 +44,13 @@ export default function PropertyDetail() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {property.photos.length > 0 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.carousel}>
+          {property.photos.map((photo) => (
+            <Image key={photo.id} source={{ uri: photo.url }} style={styles.carouselImage} />
+          ))}
+        </ScrollView>
+      ) : null}
       <Text style={styles.title}>{property.title}</Text>
       <Text style={styles.price}>{formatPrice(property.price, property.transactionType)}</Text>
       <Text style={styles.badge}>
@@ -68,6 +75,8 @@ export default function PropertyDetail() {
 
 const styles = StyleSheet.create({
   container: { padding: 24, backgroundColor: '#fff' },
+  carousel: { marginBottom: 16, marginHorizontal: -24 },
+  carouselImage: { width: 280, height: 200, borderRadius: 12, marginLeft: 12 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
   empty: { color: '#6b7280', fontSize: 16 },
   title: { fontSize: 22, fontWeight: '800', color: '#111827' },

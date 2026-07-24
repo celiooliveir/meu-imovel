@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Image } from 'react-native';
 import { router } from 'expo-router';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -53,6 +53,9 @@ export default function SearchScreen() {
             style={styles.card}
             onPress={() => router.push({ pathname: '/property/[id]', params: { id: item.id } })}
           >
+            {item.photos.length > 0 ? (
+              <Image source={{ uri: item.photos[0].url }} style={styles.cardImage} />
+            ) : null}
             <Text style={styles.cardTitle}>{item.title}</Text>
             <Text style={styles.cardSub}>{item.city} • {TRANSACTION_LABEL[item.transactionType]}</Text>
             <Text style={styles.cardPrice}>{formatPrice(item.price, item.transactionType)}</Text>
@@ -71,6 +74,7 @@ const styles = StyleSheet.create({
   card: {
     padding: 16, borderRadius: 12, borderWidth: 1.5, borderColor: '#e5e7eb', marginBottom: 12,
   },
+  cardImage: { width: '100%', height: 140, borderRadius: 8, marginBottom: 8 },
   cardTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
   cardSub: { fontSize: 13, color: '#6b7280', marginTop: 4 },
   cardPrice: { fontSize: 15, fontWeight: '700', color: '#1a56db', marginTop: 8 },

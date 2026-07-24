@@ -146,10 +146,11 @@ export default function PropertyForm() {
     try {
       if (isEditing && id) {
         await propertyApi.update(id, { ...buildPayload(), isActive });
+        router.back();
       } else {
-        await propertyApi.create(buildPayload());
+        const { data } = await propertyApi.create(buildPayload());
+        router.replace({ pathname: '/property/photos', params: { id: data.id } });
       }
-      router.back();
     } catch {
       Alert.alert('Erro', 'Não foi possível salvar o anúncio');
     } finally {
@@ -261,6 +262,16 @@ export default function PropertyForm() {
       <Button title={isEditing ? 'Salvar' : 'Publicar'} onPress={handleSubmit} loading={saving} />
 
       {isEditing ? (
+        <View style={styles.manageButtonWrapper}>
+          <Button
+            title="Gerenciar fotos"
+            variant="outline"
+            onPress={() => id && router.push({ pathname: '/property/photos', params: { id } })}
+          />
+        </View>
+      ) : null}
+
+      {isEditing ? (
         <View style={styles.deleteButtonWrapper}>
           <Button title="Excluir anúncio" variant="outline" onPress={handleDelete} />
         </View>
@@ -287,4 +298,5 @@ const styles = StyleSheet.create({
   },
   switchLabel: { fontSize: 15, color: '#111827', fontWeight: '600' },
   deleteButtonWrapper: { marginTop: 4 },
+  manageButtonWrapper: { marginTop: 4 },
 });

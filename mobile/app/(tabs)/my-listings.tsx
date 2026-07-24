@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Button } from '../../components/ui/Button';
 import { propertyApi, Property } from '../../services/properties';
@@ -76,6 +76,9 @@ export default function MyListingsScreen() {
             style={[styles.card, !item.isActive && styles.cardInactive]}
             onPress={() => router.push({ pathname: '/property/form', params: { id: item.id } })}
           >
+            {item.photos.length > 0 ? (
+              <Image source={{ uri: item.photos[0].url }} style={styles.cardImage} />
+            ) : null}
             {!item.isActive ? <Text style={styles.badge}>Inativo</Text> : null}
             <Text style={styles.cardTitle}>{item.title}</Text>
             <Text style={styles.cardSub}>{item.city} • {TRANSACTION_LABEL[item.transactionType]}</Text>
@@ -96,6 +99,7 @@ const styles = StyleSheet.create({
   card: {
     padding: 16, borderRadius: 12, borderWidth: 1.5, borderColor: '#e5e7eb', marginBottom: 12,
   },
+  cardImage: { width: '100%', height: 140, borderRadius: 8, marginBottom: 8 },
   cardInactive: { opacity: 0.6 },
   badge: {
     alignSelf: 'flex-start', backgroundColor: '#fee2e2', color: '#b91c1c',
