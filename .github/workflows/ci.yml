@@ -52,6 +52,9 @@ jobs:
           JWT_REFRESH_SECRET: ci-refresh-placeholder-min-64-chars-bbbbbbbbbbbbbbbbbbbbbbbbbbbbb
           JWT_REFRESH_EXPIRES_IN: 30d
           NODE_ENV: test
+          CLOUDINARY_CLOUD_NAME: ci-placeholder
+          CLOUDINARY_API_KEY: ci-placeholder
+          CLOUDINARY_API_SECRET: ci-placeholder
 
   mobile-typecheck:
     name: Mobile — TypeScript

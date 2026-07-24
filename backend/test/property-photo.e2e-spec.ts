@@ -5,6 +5,9 @@ import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { CloudinaryService } from '../src/shared/cloudinary/cloudinary.service';
 
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const fakePngBuffer = () => Buffer.concat([PNG_SIGNATURE, Buffer.from('rest-of-fake-png-content')]);
+
 describe('Property Photos (e2e)', () => {
   let app: INestApplication;
   let ownerToken: string;
@@ -91,7 +94,7 @@ describe('Property Photos (e2e)', () => {
     const res = await request(app.getHttpServer())
       .post(`/api/v1/properties/${propertyId}/photos`)
       .set('Authorization', `Bearer ${ownerToken}`)
-      .attach('photos', Buffer.from('fake-image-content'), { filename: 'photo.jpg', contentType: 'image/jpeg' })
+      .attach('photos', fakePngBuffer(), { filename: 'photo.png', contentType: 'image/png' })
       .expect(201);
 
     expect(res.body).toHaveLength(1);
@@ -104,7 +107,7 @@ describe('Property Photos (e2e)', () => {
     await request(app.getHttpServer())
       .post(`/api/v1/properties/${propertyId}/photos`)
       .set('Authorization', `Bearer ${tenantToken}`)
-      .attach('photos', Buffer.from('fake-image-content'), { filename: 'photo.jpg', contentType: 'image/jpeg' })
+      .attach('photos', fakePngBuffer(), { filename: 'photo.png', contentType: 'image/png' })
       .expect(403);
 
     expect(mockCloudinaryService.upload).not.toHaveBeenCalled();
@@ -114,7 +117,7 @@ describe('Property Photos (e2e)', () => {
     await request(app.getHttpServer())
       .post(`/api/v1/properties/${propertyId}/photos`)
       .set('Authorization', `Bearer ${ownerBToken}`)
-      .attach('photos', Buffer.from('fake-image-content'), { filename: 'photo.jpg', contentType: 'image/jpeg' })
+      .attach('photos', fakePngBuffer(), { filename: 'photo.png', contentType: 'image/png' })
       .expect(403);
 
     expect(mockCloudinaryService.upload).not.toHaveBeenCalled();
@@ -136,7 +139,7 @@ describe('Property Photos (e2e)', () => {
       .set('Authorization', `Bearer ${ownerToken}`);
 
     for (let i = 0; i < 10; i += 1) {
-      req.attach('photos', Buffer.from(`fake-image-${i}`), { filename: `photo${i}.jpg`, contentType: 'image/jpeg' });
+      req.attach('photos', fakePngBuffer(), { filename: `photo${i}.png`, contentType: 'image/png' });
     }
 
     await req.expect(400);
@@ -147,7 +150,7 @@ describe('Property Photos (e2e)', () => {
     const uploadRes = await request(app.getHttpServer())
       .post(`/api/v1/properties/${propertyId}/photos`)
       .set('Authorization', `Bearer ${ownerToken}`)
-      .attach('photos', Buffer.from('fake-image-content'), { filename: 'photo.jpg', contentType: 'image/jpeg' })
+      .attach('photos', fakePngBuffer(), { filename: 'photo.png', contentType: 'image/png' })
       .expect(201);
     const photoId = uploadRes.body[0].id;
 
@@ -163,7 +166,7 @@ describe('Property Photos (e2e)', () => {
     const uploadRes = await request(app.getHttpServer())
       .post(`/api/v1/properties/${propertyId}/photos`)
       .set('Authorization', `Bearer ${ownerToken}`)
-      .attach('photos', Buffer.from('fake-image-content'), { filename: 'photo.jpg', contentType: 'image/jpeg' })
+      .attach('photos', fakePngBuffer(), { filename: 'photo.png', contentType: 'image/png' })
       .expect(201);
     const photoId = uploadRes.body[0].id;
 
@@ -185,7 +188,7 @@ describe('Property Photos (e2e)', () => {
     await request(app.getHttpServer())
       .post(`/api/v1/properties/${propertyId}/photos`)
       .set('Authorization', `Bearer ${ownerToken}`)
-      .attach('photos', Buffer.from('fake-image-content'), { filename: 'photo.jpg', contentType: 'image/jpeg' })
+      .attach('photos', fakePngBuffer(), { filename: 'photo.png', contentType: 'image/png' })
       .expect(201);
 
     const res = await request(app.getHttpServer())

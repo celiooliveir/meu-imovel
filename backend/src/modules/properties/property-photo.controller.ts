@@ -20,7 +20,7 @@ export class PropertyPhotoController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.OWNER, UserRole.BROKER)
-  @UseInterceptors(FilesInterceptor('photos', 10, { storage: memoryStorage() }))
+  @UseInterceptors(FilesInterceptor('photos', 10, { storage: memoryStorage(), limits: { fileSize: MAX_FILE_SIZE_BYTES } }))
   async upload(
     @Param('propertyId', new ParseUUIDPipe()) propertyId: string,
     @UploadedFiles(

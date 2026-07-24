@@ -78,6 +78,22 @@ describe('PropertyPhotoService', () => {
       await expect(service.upload('prop-1', 'owner-1', [file, file])).rejects.toThrow(BadRequestException);
       expect(mockCloudinary.upload).not.toHaveBeenCalled();
     });
+
+    it('should upload successfully when the count reaches exactly the limit (existing 9 + 1 new = 10)', async () => {
+      mockPropertyService.findByIdOrThrow.mockResolvedValue({ id: 'prop-1', ownerId: 'owner-1' } as Property);
+      mockPhotoRepo.count.mockResolvedValue(9);
+      mockCloudinary.upload.mockResolvedValue({
+        url: 'https://cloudinary/img.jpg',
+        publicId: 'properties/prop-1/img',
+      });
+      mockPhotoRepo.create.mockReturnValue({ id: 'photo-1' } as PropertyPhoto);
+      mockPhotoRepo.save.mockResolvedValue({ id: 'photo-1' } as PropertyPhoto);
+
+      const result = await service.upload('prop-1', 'owner-1', [file]);
+
+      expect(mockCloudinary.upload).toHaveBeenCalledWith(file.buffer, 'properties/prop-1');
+      expect(result).toEqual([{ id: 'photo-1' }]);
+    });
   });
 
   describe('remove', () => {
