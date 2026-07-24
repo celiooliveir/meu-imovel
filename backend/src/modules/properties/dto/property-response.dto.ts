@@ -1,5 +1,10 @@
 import { Property, PropertyType, TransactionType } from '../property.entity';
 
+export interface PropertyPhotoResponse {
+  id: string;
+  url: string;
+}
+
 export class PropertyResponseDto {
   id: string;
   title: string;
@@ -19,6 +24,7 @@ export class PropertyResponseDto {
   isActive: boolean;
   ownerId: string;
   createdAt: Date;
+  photos: PropertyPhotoResponse[];
 
   static fromEntity(property: Property): PropertyResponseDto {
     const dto = new PropertyResponseDto();
@@ -40,6 +46,9 @@ export class PropertyResponseDto {
     dto.isActive = property.isActive;
     dto.ownerId = property.ownerId;
     dto.createdAt = property.createdAt;
+    dto.photos = [...(property.photos ?? [])]
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .map((photo) => ({ id: photo.id, url: photo.url }));
     return dto;
   }
 }

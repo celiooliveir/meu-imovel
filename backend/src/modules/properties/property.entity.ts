@@ -1,6 +1,7 @@
-import { Entity, Column, Index, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, Index, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../shared/database/base.entity';
 import { User } from '../users/user.entity';
+import { PropertyPhoto } from './property-photo.entity';
 
 export enum PropertyType {
   APARTMENT = 'apartment',
@@ -74,4 +75,7 @@ export class Property extends BaseEntity {
   @ManyToOne(() => User)
   @JoinColumn({ name: 'ownerId' })
   owner: User;
+
+  @OneToMany(() => PropertyPhoto, (photo) => photo.property)
+  photos: PropertyPhoto[];
 }
