@@ -12,6 +12,7 @@ export class GeocodingService {
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
       const response = await fetch(url, {
         headers: { 'User-Agent': 'meu-imovel-app (contato@meuimovel.com.br)' },
+        signal: AbortSignal.timeout(5000),
       });
       if (!response.ok) return null;
 

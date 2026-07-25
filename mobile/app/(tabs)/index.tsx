@@ -59,9 +59,13 @@ export default function SearchScreen() {
       Alert.alert('Permissão negada', 'Ative a localização para buscar imóveis perto de você');
       return;
     }
-    const position = await Location.getCurrentPositionAsync({});
-    setCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
-    setNearMe(true);
+    try {
+      const position = await Location.getCurrentPositionAsync({});
+      setCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
+      setNearMe(true);
+    } catch {
+      Alert.alert('Erro', 'Não foi possível obter sua localização');
+    }
   };
 
   return (
