@@ -3,6 +3,7 @@ import {
   UseGuards, HttpCode, HttpStatus, ParseUUIDPipe,
 } from '@nestjs/common';
 import { PropertyService } from './property.service';
+import { PropertyFavoriteService } from './property-favorite.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { SearchPropertyQueryDto } from './dto/search-property-query.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
@@ -15,7 +16,10 @@ import { UserRole } from '../users/user.entity';
 
 @Controller('properties')
 export class PropertyController {
-  constructor(private readonly propertyService: PropertyService) {}
+  constructor(
+    private readonly propertyService: PropertyService,
+    private readonly favoriteService: PropertyFavoriteService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -43,6 +47,23 @@ export class PropertyController {
       query.limit ?? 20,
     );
     return { items: items.map(PropertyResponseDto.fromEntity), total, page, limit };
+  }
+
+  @Get('favorites')
+  @UseGuards(JwtAuthGuard)
+  async findFavorites(@Query() query: SearchPropertyQueryDto, @CurrentUser() user: { id: string }) {
+    const { items, total, page, limit } = await this.favoriteService.findFavorites(
+      user.id,
+      query.page ?? 1,
+      query.limit ?? 20,
+    );
+    return { items: items.map(PropertyResponseDto.fromEntity), total, page, limit };
+  }
+
+  @Get('favorites/ids')
+  @UseGuards(JwtAuthGuard)
+  async findFavoriteIds(@CurrentUser() user: { id: string }) {
+    return this.favoriteService.findFavoriteIds(user.id);
   }
 
   @Get(':id')
