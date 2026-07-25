@@ -33,10 +33,13 @@ export interface Property {
   city: string;
   state: string;
   zipCode: string;
+  latitude: number | null;
+  longitude: number | null;
   isActive: boolean;
   ownerId: string;
   createdAt: string;
   photos: PropertyPhoto[];
+  distanceKm?: number;
 }
 
 export interface PropertySearchFilters {
@@ -48,6 +51,9 @@ export interface PropertySearchFilters {
   bedrooms?: number;
   q?: string;
   page?: number;
+  lat?: number;
+  lng?: number;
+  radiusKm?: number;
 }
 
 export interface PropertySearchResult {
