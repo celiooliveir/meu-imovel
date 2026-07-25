@@ -166,6 +166,38 @@ describe('PropertyService', () => {
       expect(mockQueryBuilder.take).toHaveBeenCalledWith(20);
       expect(mockPhotoRepo.find).not.toHaveBeenCalled();
     });
+
+    it('should add the radius filter and order by distance when lat/lng are provided', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([
+        [{ id: 'prop-1', latitude: -23.55, longitude: -46.63 } as Property],
+        1,
+      ]);
+
+      const query: SearchPropertyQueryDto = { lat: -23.55, lng: -46.63, radiusKm: 25 };
+      const result = await service.search(query);
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('property.location IS NOT NULL');
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'ST_DWithin(property.location, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radiusMeters)',
+        { lng: -46.63, lat: -23.55, radiusMeters: 25000 },
+      );
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+        'ST_Distance(property.location, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography)',
+        'ASC',
+      );
+      expect(result.items[0].distanceKm).toBeCloseTo(0, 1);
+    });
+
+    it('should default the radius to 10km when not provided', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.search({ lat: -23.55, lng: -46.63 });
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'ST_DWithin(property.location, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radiusMeters)',
+        { lng: -46.63, lat: -23.55, radiusMeters: 10000 },
+      );
+    });
   });
 
   describe('findMine', () => {

@@ -61,12 +61,35 @@ export class PropertyService {
       qb.andWhere('(property.title ILIKE :q OR property.description ILIKE :q)', { q: `%${query.q}%` });
     }
 
-    qb.orderBy('property.createdAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit);
+    const hasGeoFilter = query.lat !== undefined && query.lng !== undefined;
+    if (hasGeoFilter) {
+      const radiusMeters = (query.radiusKm ?? 10) * 1000;
+      qb.andWhere('property.location IS NOT NULL')
+        .andWhere(
+          'ST_DWithin(property.location, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radiusMeters)',
+          { lng: query.lng, lat: query.lat, radiusMeters },
+        )
+        .orderBy(
+          'ST_Distance(property.location, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography)',
+          'ASC',
+        );
+    } else {
+      qb.orderBy('property.createdAt', 'DESC');
+    }
+
+    qb.skip((page - 1) * limit).take(limit);
 
     const [items, total] = await qb.getManyAndCount();
     await this.attachPhotos(items);
+
+    if (hasGeoFilter) {
+      for (const item of items) {
+        if (item.latitude !== null && item.longitude !== null) {
+          item.distanceKm = haversineKm(query.lat as number, query.lng as number, item.latitude, item.longitude);
+        }
+      }
+    }
+
     return { items, total, page, limit };
   }
 
@@ -170,4 +193,15 @@ export class PropertyService {
       property.photos = photosByProperty.get(property.id) ?? [];
     }
   }
+}
+
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const EARTH_RADIUS_KM = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return EARTH_RADIUS_KM * c;
 }

@@ -340,6 +340,43 @@ describe('Properties (e2e)', () => {
     expect(ids).toEqual([spHouseId]);
   });
 
+  it('GET /api/v1/properties?lat=&lng=&radiusKm= — filtra por proximidade e ordena por distância', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/properties')
+      .query({ lat: -23.5505, lng: -46.6333, radiusKm: 50 })
+      .set('Authorization', `Bearer ${tenantToken}`)
+      .expect(200);
+
+    const ids = res.body.items.map((p: { id: string }) => p.id);
+    expect(ids).toEqual(expect.arrayContaining([spFlatId, spHouseId]));
+    expect(ids).not.toContain(rioFlatId);
+    expect(ids).not.toContain(curitibaLandId);
+    expect(res.body.items[0].distanceKm).toBeCloseTo(0, 1);
+  });
+
+  it('GET /api/v1/properties?lat=&lng= — usa raio padrão de 10km quando radiusKm não é informado', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/properties')
+      .query({ lat: -23.5505, lng: -46.6333 })
+      .set('Authorization', `Bearer ${tenantToken}`)
+      .expect(200);
+
+    const ids = res.body.items.map((p: { id: string }) => p.id);
+    expect(ids).toEqual(expect.arrayContaining([spFlatId, spHouseId]));
+    expect(ids).not.toContain(curitibaLandId);
+  });
+
+  it('GET /api/v1/properties — sem lat/lng mantém a ordenação por data, sem filtro de raio', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/properties')
+      .set('Authorization', `Bearer ${tenantToken}`)
+      .expect(200);
+
+    const ids = res.body.items.map((p: { id: string }) => p.id);
+    expect(ids).toEqual(expect.arrayContaining([spFlatId, spHouseId, rioFlatId, curitibaLandId]));
+    expect(res.body.items[0].distanceKm).toBeUndefined();
+  });
+
   it('GET /api/v1/properties/:id — retorna o imóvel', async () => {
     const res = await request(app.getHttpServer())
       .get(`/api/v1/properties/${spFlatId}`)
