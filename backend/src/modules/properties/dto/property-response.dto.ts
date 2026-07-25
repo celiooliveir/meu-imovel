@@ -21,10 +21,13 @@ export class PropertyResponseDto {
   city: string;
   state: string;
   zipCode: string;
+  latitude: number | null;
+  longitude: number | null;
   isActive: boolean;
   ownerId: string;
   createdAt: Date;
   photos: PropertyPhotoResponse[];
+  distanceKm?: number;
 
   static fromEntity(property: Property): PropertyResponseDto {
     const dto = new PropertyResponseDto();
@@ -43,12 +46,15 @@ export class PropertyResponseDto {
     dto.city = property.city;
     dto.state = property.state;
     dto.zipCode = property.zipCode;
+    dto.latitude = property.latitude;
+    dto.longitude = property.longitude;
     dto.isActive = property.isActive;
     dto.ownerId = property.ownerId;
     dto.createdAt = property.createdAt;
     dto.photos = [...(property.photos ?? [])]
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
       .map((photo) => ({ id: photo.id, url: photo.url }));
+    dto.distanceKm = property.distanceKm;
     return dto;
   }
 }

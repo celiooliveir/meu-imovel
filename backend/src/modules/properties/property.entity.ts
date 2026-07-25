@@ -66,6 +66,18 @@ export class Property extends BaseEntity {
   @Column()
   zipCode: string;
 
+  @Column('decimal', { precision: 10, scale: 7, nullable: true, transformer: decimalTransformer })
+  latitude: number | null;
+
+  @Column('decimal', { precision: 10, scale: 7, nullable: true, transformer: decimalTransformer })
+  longitude: number | null;
+
+  // PostGIS geography point, used only by ST_DWithin/ST_Distance in raw SQL.
+  // Never read directly and never written via plain save() — see property.service.ts.
+  @Index({ spatial: true })
+  @Column({ type: 'geography', spatialFeatureType: 'Point', srid: 4326, nullable: true, select: false })
+  location: string | null;
+
   @Column({ default: true })
   isActive: boolean;
 
@@ -78,4 +90,7 @@ export class Property extends BaseEntity {
 
   @OneToMany(() => PropertyPhoto, (photo) => photo.property)
   photos: PropertyPhoto[];
+
+  // Transient — populated only by PropertyService.search() when a geo filter is active. Not a DB column.
+  distanceKm?: number;
 }

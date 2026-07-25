@@ -6,6 +6,9 @@ import { PropertyPhoto } from './property-photo.entity';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { SearchPropertyQueryDto } from './dto/search-property-query.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
+import { GeocodingService } from '../../shared/geocoding/geocoding.service';
+
+const ADDRESS_FIELDS = ['street', 'number', 'neighborhood', 'city', 'state', 'zipCode'] as const;
 
 @Injectable()
 export class PropertyService {
@@ -14,11 +17,20 @@ export class PropertyService {
     private readonly propertyRepo: Repository<Property>,
     @InjectRepository(PropertyPhoto)
     private readonly photoRepo: Repository<PropertyPhoto>,
+    private readonly geocodingService: GeocodingService,
   ) {}
 
   async create(dto: CreatePropertyDto, ownerId: string): Promise<Property> {
-    const property = this.propertyRepo.create({ ...dto, ownerId });
-    return this.propertyRepo.save(property);
+    const geo = await this.geocodingService.geocode(this.composeAddress(dto));
+    const property = this.propertyRepo.create({
+      ...dto,
+      ownerId,
+      latitude: geo?.latitude ?? null,
+      longitude: geo?.longitude ?? null,
+    });
+    const saved = await this.propertyRepo.save(property);
+    await this.setPropertyLocation(saved.id, saved.latitude, saved.longitude);
+    return saved;
   }
 
   async findByIdOrThrow(id: string): Promise<Property> {
@@ -78,8 +90,26 @@ export class PropertyService {
     if (property.ownerId !== ownerId) {
       throw new ForbiddenException('Você não pode editar um imóvel de outro usuário');
     }
+
+    const addressChanged = ADDRESS_FIELDS.some(
+      (field) => dto[field] !== undefined && dto[field] !== property[field],
+    );
+
     Object.assign(property, dto);
-    return this.propertyRepo.save(property);
+
+    if (addressChanged) {
+      const geo = await this.geocodingService.geocode(this.composeAddress(property));
+      property.latitude = geo?.latitude ?? null;
+      property.longitude = geo?.longitude ?? null;
+    }
+
+    const saved = await this.propertyRepo.save(property);
+
+    if (addressChanged) {
+      await this.setPropertyLocation(saved.id, saved.latitude, saved.longitude);
+    }
+
+    return saved;
   }
 
   async remove(id: string, ownerId: string): Promise<void> {
@@ -88,6 +118,38 @@ export class PropertyService {
       throw new ForbiddenException('Você não pode excluir um imóvel de outro usuário');
     }
     await this.propertyRepo.softRemove(property);
+  }
+
+  private composeAddress(fields: {
+    street: string;
+    number: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  }): string {
+    return `${fields.street}, ${fields.number}, ${fields.neighborhood}, ${fields.city}, ${fields.state}, ${fields.zipCode}`;
+  }
+
+  // The geography column can't be safely set via plain save() (Postgres won't reliably
+  // auto-cast a parameterized text value to geography), so it's always written through
+  // an explicit ST_SetSRID(ST_MakePoint(...))::geography raw update.
+  private async setPropertyLocation(
+    propertyId: string,
+    latitude: number | null,
+    longitude: number | null,
+  ): Promise<void> {
+    if (latitude === null || longitude === null) {
+      await this.propertyRepo.update(propertyId, { location: null });
+      return;
+    }
+    await this.propertyRepo
+      .createQueryBuilder()
+      .update(Property)
+      .set({ location: () => 'ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography' })
+      .where('id = :id', { id: propertyId })
+      .setParameters({ lng: longitude, lat: latitude })
+      .execute();
   }
 
   // A joined query here would multiply/mis-count rows for paginated

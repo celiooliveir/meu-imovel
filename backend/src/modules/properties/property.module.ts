@@ -7,9 +7,10 @@ import { PropertyController } from './property.controller';
 import { PropertyPhotoService } from './property-photo.service';
 import { PropertyPhotoController } from './property-photo.controller';
 import { CloudinaryModule } from '../../shared/cloudinary/cloudinary.module';
+import { GeocodingModule } from '../../shared/geocoding/geocoding.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Property, PropertyPhoto]), CloudinaryModule],
+  imports: [TypeOrmModule.forFeature([Property, PropertyPhoto]), CloudinaryModule, GeocodingModule],
   providers: [PropertyService, PropertyPhotoService],
   controllers: [PropertyController, PropertyPhotoController],
 })

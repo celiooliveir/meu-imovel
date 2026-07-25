@@ -6,6 +6,7 @@ import { Property, PropertyType, TransactionType } from './property.entity';
 import { PropertyPhoto } from './property-photo.entity';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { SearchPropertyQueryDto } from './dto/search-property-query.dto';
+import { GeocodingService } from '../../shared/geocoding/geocoding.service';
 
 describe('PropertyService', () => {
   let service: PropertyService;
@@ -17,6 +18,11 @@ describe('PropertyService', () => {
     skip: jest.fn().mockReturnThis(),
     take: jest.fn().mockReturnThis(),
     getManyAndCount: jest.fn(),
+    // Update-query-builder chain, reused for the location raw update (create/update paths).
+    update: jest.fn().mockReturnThis(),
+    set: jest.fn().mockReturnThis(),
+    setParameters: jest.fn().mockReturnThis(),
+    execute: jest.fn().mockResolvedValue(undefined),
   };
 
   const mockRepo = {
@@ -25,11 +31,16 @@ describe('PropertyService', () => {
     findOne: jest.fn(),
     findAndCount: jest.fn(),
     softRemove: jest.fn(),
+    update: jest.fn().mockResolvedValue(undefined),
     createQueryBuilder: jest.fn(() => mockQueryBuilder),
   };
 
   const mockPhotoRepo = {
     find: jest.fn(),
+  };
+
+  const mockGeocodingService = {
+    geocode: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -38,40 +49,78 @@ describe('PropertyService', () => {
         PropertyService,
         { provide: getRepositoryToken(Property), useValue: mockRepo },
         { provide: getRepositoryToken(PropertyPhoto), useValue: mockPhotoRepo },
+        { provide: GeocodingService, useValue: mockGeocodingService },
       ],
     }).compile();
     service = module.get(PropertyService);
     jest.clearAllMocks();
     Object.values(mockQueryBuilder).forEach((fn) => {
-      if (fn !== mockQueryBuilder.getManyAndCount) fn.mockReturnThis();
+      if (fn !== mockQueryBuilder.getManyAndCount && fn !== mockQueryBuilder.execute) fn.mockReturnThis();
     });
+    mockQueryBuilder.execute.mockResolvedValue(undefined);
     mockPhotoRepo.find.mockResolvedValue([]);
+    mockGeocodingService.geocode.mockResolvedValue(null);
   });
 
   describe('create', () => {
+    const dto: CreatePropertyDto = {
+      title: 'Casa térrea',
+      description: 'Descrição com mais de dez caracteres',
+      type: PropertyType.HOUSE,
+      transactionType: TransactionType.SALE,
+      price: 100000,
+      street: 'Rua A',
+      number: '1',
+      neighborhood: 'Centro',
+      city: 'Curitiba',
+      state: 'PR',
+      zipCode: '80000-000',
+    };
+
     it('should attach ownerId and save the property', async () => {
-      const dto: CreatePropertyDto = {
-        title: 'Casa térrea',
-        description: 'Descrição com mais de dez caracteres',
-        type: PropertyType.HOUSE,
-        transactionType: TransactionType.SALE,
-        price: 100000,
-        street: 'Rua A',
-        number: '1',
-        neighborhood: 'Centro',
-        city: 'Curitiba',
-        state: 'PR',
-        zipCode: '80000-000',
-      };
-      const created = { ...dto, ownerId: 'owner-1' } as Property;
+      const created = { ...dto, ownerId: 'owner-1', id: 'prop-1', latitude: null, longitude: null } as Property;
       mockRepo.create.mockReturnValue(created);
       mockRepo.save.mockResolvedValue(created);
 
       const result = await service.create(dto, 'owner-1');
 
-      expect(mockRepo.create).toHaveBeenCalledWith(expect.objectContaining({ ...dto, ownerId: 'owner-1' }));
+      expect(mockRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ ...dto, ownerId: 'owner-1', latitude: null, longitude: null }),
+      );
       expect(mockRepo.save).toHaveBeenCalledWith(created);
       expect(result.ownerId).toBe('owner-1');
+    });
+
+    it('should geocode the address and save the coordinates when found', async () => {
+      mockGeocodingService.geocode.mockResolvedValue({ latitude: -25.4284, longitude: -49.2733 });
+      const created = {
+        ...dto, ownerId: 'owner-1', id: 'prop-1', latitude: -25.4284, longitude: -49.2733,
+      } as Property;
+      mockRepo.create.mockReturnValue(created);
+      mockRepo.save.mockResolvedValue(created);
+
+      await service.create(dto, 'owner-1');
+
+      expect(mockGeocodingService.geocode).toHaveBeenCalledWith('Rua A, 1, Centro, Curitiba, PR, 80000-000');
+      expect(mockRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ latitude: -25.4284, longitude: -49.2733 }),
+      );
+      expect(mockQueryBuilder.update).toHaveBeenCalledWith(Property);
+      expect(mockQueryBuilder.set).toHaveBeenCalledWith({
+        location: expect.any(Function),
+      });
+      expect(mockQueryBuilder.setParameters).toHaveBeenCalledWith({ lng: -49.2733, lat: -25.4284 });
+    });
+
+    it('should save with null coordinates when geocoding finds nothing', async () => {
+      mockGeocodingService.geocode.mockResolvedValue(null);
+      const created = { ...dto, ownerId: 'owner-1', id: 'prop-1', latitude: null, longitude: null } as Property;
+      mockRepo.create.mockReturnValue(created);
+      mockRepo.save.mockResolvedValue(created);
+
+      await service.create(dto, 'owner-1');
+
+      expect(mockRepo.update).toHaveBeenCalledWith('prop-1', { location: null });
     });
   });
 
@@ -149,7 +198,10 @@ describe('PropertyService', () => {
 
   describe('update', () => {
     it('should update and save when the requester owns the property', async () => {
-      const existing = { id: 'prop-1', ownerId: 'owner-1', price: 100 } as Property;
+      const existing = {
+        id: 'prop-1', ownerId: 'owner-1', price: 100,
+        street: 'Rua A', number: '1', neighborhood: 'Centro', city: 'Curitiba', state: 'PR', zipCode: '80000-000',
+      } as Property;
       mockRepo.findOne.mockResolvedValue(existing);
       mockRepo.save.mockImplementation((p) => Promise.resolve(p));
 
@@ -157,6 +209,7 @@ describe('PropertyService', () => {
 
       expect(result.price).toBe(200);
       expect(mockRepo.save).toHaveBeenCalledWith(expect.objectContaining({ id: 'prop-1', price: 200 }));
+      expect(mockGeocodingService.geocode).not.toHaveBeenCalled();
     });
 
     it('should throw ForbiddenException when the requester does not own the property', async () => {
@@ -164,6 +217,23 @@ describe('PropertyService', () => {
 
       await expect(service.update('prop-1', 'owner-2', { price: 200 })).rejects.toThrow(ForbiddenException);
       expect(mockRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should re-geocode when an address field changes', async () => {
+      const existing = {
+        id: 'prop-1', ownerId: 'owner-1',
+        street: 'Rua A', number: '1', neighborhood: 'Centro', city: 'Curitiba', state: 'PR', zipCode: '80000-000',
+      } as Property;
+      mockRepo.findOne.mockResolvedValue(existing);
+      mockRepo.save.mockImplementation((p) => Promise.resolve(p));
+      mockGeocodingService.geocode.mockResolvedValue({ latitude: -23.5505, longitude: -46.6333 });
+
+      await service.update('prop-1', 'owner-1', { city: 'São Paulo', state: 'SP' });
+
+      expect(mockGeocodingService.geocode).toHaveBeenCalledWith(
+        'Rua A, 1, Centro, São Paulo, SP, 80000-000',
+      );
+      expect(mockQueryBuilder.setParameters).toHaveBeenCalledWith({ lng: -46.6333, lat: -23.5505 });
     });
   });
 

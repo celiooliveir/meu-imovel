@@ -3,6 +3,23 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
+import { GeocodingService } from '../src/shared/geocoding/geocoding.service';
+
+const CITY_COORDINATES: Record<string, { latitude: number; longitude: number }> = {
+  'São Paulo': { latitude: -23.5505, longitude: -46.6333 },
+  'Rio de Janeiro': { latitude: -22.9068, longitude: -43.1729 },
+  Curitiba: { latitude: -25.4284, longitude: -49.2733 },
+  Salvador: { latitude: -12.9777, longitude: -38.5016 },
+  'Belo Horizonte': { latitude: -19.9167, longitude: -43.9345 },
+  'Porto Alegre': { latitude: -30.0346, longitude: -51.2177 },
+};
+
+const mockGeocodingService = {
+  geocode: jest.fn((address: string) => {
+    const city = Object.keys(CITY_COORDINATES).find((c) => address.includes(c));
+    return Promise.resolve(city ? CITY_COORDINATES[city] : null);
+  }),
+};
 
 describe('Properties (e2e)', () => {
   let app: INestApplication;
@@ -30,7 +47,10 @@ describe('Properties (e2e)', () => {
 
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(GeocodingService)
+      .useValue(mockGeocodingService)
+      .compile();
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api/v1');
@@ -203,6 +223,8 @@ describe('Properties (e2e)', () => {
     expect(res.body.price).toBe(validProperty.price);
     expect(res.body.isActive).toBe(true);
     expect(res.body.ownerId).toBeDefined();
+    expect(res.body.latitude).toBeCloseTo(-19.9167, 3);
+    expect(res.body.longitude).toBeCloseTo(-43.9345, 3);
   });
 
   it('POST /api/v1/properties — broker também pode criar', async () => {
