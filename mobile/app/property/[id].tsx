@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, Image, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { propertyApi, Property } from '../../services/properties';
+import { useFavoritesStore } from '../../stores/favorites.store';
 
 const TYPE_LABEL: Record<string, string> = {
   apartment: 'Apartamento', house: 'Casa', commercial: 'Comercial', land: 'Terreno',
@@ -17,6 +18,8 @@ export default function PropertyDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
+  const favoriteIds = useFavoritesStore((s) => s.ids);
+  const toggleFavorite = useFavoritesStore((s) => s.toggle);
 
   useEffect(() => {
     propertyApi
@@ -42,6 +45,8 @@ export default function PropertyDetail() {
     );
   }
 
+  const isFavorited = favoriteIds.has(property.id);
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {property.photos.length > 0 ? (
@@ -56,6 +61,11 @@ export default function PropertyDetail() {
       <Text style={styles.badge}>
         {TYPE_LABEL[property.type]} • {TRANSACTION_LABEL[property.transactionType]}
       </Text>
+      <TouchableOpacity style={styles.favoriteButton} onPress={() => toggleFavorite(property.id)}>
+        <Text style={styles.favoriteButtonText}>
+          {isFavorited ? '♥ Favoritado' : '♡ Favoritar'}
+        </Text>
+      </TouchableOpacity>
       <Text style={styles.section}>Endereço</Text>
       <Text style={styles.text}>
         {property.street}, {property.number} — {property.neighborhood}{'\n'}
@@ -82,6 +92,11 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '800', color: '#111827' },
   price: { fontSize: 20, fontWeight: '700', color: '#1a56db', marginTop: 8 },
   badge: { fontSize: 13, color: '#6b7280', marginTop: 4, marginBottom: 16 },
+  favoriteButton: {
+    alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8,
+    borderWidth: 1.5, borderColor: '#ef4444', marginBottom: 8,
+  },
+  favoriteButtonText: { fontSize: 14, fontWeight: '600', color: '#ef4444' },
   section: { fontSize: 14, fontWeight: '700', color: '#374151', marginTop: 16, marginBottom: 4 },
   text: { fontSize: 15, color: '#111827', lineHeight: 22 },
 });

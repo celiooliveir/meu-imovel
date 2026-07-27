@@ -5,6 +5,7 @@ import * as Location from 'expo-location';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { useAuthStore } from '../../stores/auth.store';
+import { useFavoritesStore } from '../../stores/favorites.store';
 import { propertyApi, Property } from '../../services/properties';
 
 const TRANSACTION_LABEL: Record<string, string> = { sale: 'Venda', rent: 'Aluguel' };
@@ -17,6 +18,8 @@ function formatPrice(price: number, transactionType: string) {
 
 export default function SearchScreen() {
   const user = useAuthStore((s) => s.user);
+  const favoriteIds = useFavoritesStore((s) => s.ids);
+  const toggleFavorite = useFavoritesStore((s) => s.toggle);
   const [q, setQ] = useState('');
   const [city, setCity] = useState('');
   const [items, setItems] = useState<Property[]>([]);
@@ -110,6 +113,9 @@ export default function SearchScreen() {
             {item.photos.length > 0 ? (
               <Image source={{ uri: item.photos[0].url }} style={styles.cardImage} />
             ) : null}
+            <TouchableOpacity style={styles.heartButton} onPress={() => toggleFavorite(item.id)}>
+              <Text style={styles.heartIcon}>{favoriteIds.has(item.id) ? '♥' : '♡'}</Text>
+            </TouchableOpacity>
             <Text style={styles.cardTitle}>{item.title}</Text>
             <Text style={styles.cardSub}>
               {item.city} • {TRANSACTION_LABEL[item.transactionType]}
@@ -146,6 +152,11 @@ const styles = StyleSheet.create({
     padding: 16, borderRadius: 12, borderWidth: 1.5, borderColor: '#e5e7eb', marginBottom: 12,
   },
   cardImage: { width: '100%', height: 140, borderRadius: 8, marginBottom: 8 },
+  heartButton: {
+    position: 'absolute', top: 12, right: 12, width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center',
+  },
+  heartIcon: { fontSize: 18, color: '#ef4444' },
   cardTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
   cardSub: { fontSize: 13, color: '#6b7280', marginTop: 4 },
   cardPrice: { fontSize: 15, fontWeight: '700', color: '#1a56db', marginTop: 8 },
