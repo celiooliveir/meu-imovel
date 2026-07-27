@@ -1,10 +1,16 @@
 import { useCallback, useRef, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { propertyApi, Property } from '../../services/properties';
+import { propertyApi, Property, PropertyStatus } from '../../services/properties';
 import { useFavoritesStore } from '../../stores/favorites.store';
 
 const TRANSACTION_LABEL: Record<string, string> = { sale: 'Venda', rent: 'Aluguel' };
+
+function statusBadgeLabel(item: Property): string | null {
+  if (item.status === PropertyStatus.DRAFT) return 'Rascunho';
+  if (item.status === PropertyStatus.CLOSED) return item.transactionType === 'rent' ? 'Alugado' : 'Vendido';
+  return null;
+}
 
 function formatPrice(price: number, transactionType: string) {
   const value = price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -78,7 +84,7 @@ export default function FavoritesScreen() {
         ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.footerLoader} color="#1a56db" /> : null}
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={[styles.card, !item.isActive && styles.cardInactive]}
+            style={[styles.card, item.status !== PropertyStatus.PUBLISHED && styles.cardInactive]}
             onPress={() => router.push({ pathname: '/property/[id]', params: { id: item.id } })}
           >
             {item.photos.length > 0 ? (
@@ -87,7 +93,7 @@ export default function FavoritesScreen() {
             <TouchableOpacity style={styles.heartButton} onPress={() => handleRemove(item.id)}>
               <Text style={styles.heartIcon}>♥</Text>
             </TouchableOpacity>
-            {!item.isActive ? <Text style={styles.badge}>Inativo</Text> : null}
+            {statusBadgeLabel(item) ? <Text style={styles.badge}>{statusBadgeLabel(item)}</Text> : null}
             <Text style={styles.cardTitle}>{item.title}</Text>
             <Text style={styles.cardSub}>{item.city} • {TRANSACTION_LABEL[item.transactionType]}</Text>
             <Text style={styles.cardPrice}>{formatPrice(item.price, item.transactionType)}</Text>
