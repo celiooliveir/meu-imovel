@@ -2,7 +2,7 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PropertyService } from './property.service';
-import { Property, PropertyType, TransactionType } from './property.entity';
+import { Property, PropertyType, TransactionType, PropertyStatus } from './property.entity';
 import { PropertyPhoto } from './property-photo.entity';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { SearchPropertyQueryDto } from './dto/search-property-query.dto';
@@ -122,6 +122,21 @@ describe('PropertyService', () => {
 
       expect(mockRepo.update).toHaveBeenCalledWith('prop-1', { location: null });
     });
+
+    it('should pass a provided status straight through to the repository', async () => {
+      const draftDto = { ...dto, status: PropertyStatus.DRAFT };
+      const created = {
+        ...draftDto, ownerId: 'owner-1', id: 'prop-1', latitude: null, longitude: null,
+      } as unknown as Property;
+      mockRepo.create.mockReturnValue(created);
+      mockRepo.save.mockResolvedValue(created);
+
+      await service.create(draftDto, 'owner-1');
+
+      expect(mockRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ status: PropertyStatus.DRAFT }),
+      );
+    });
   });
 
   describe('findByIdOrThrow', () => {
@@ -198,6 +213,17 @@ describe('PropertyService', () => {
         { lng: -46.63, lat: -23.55, radiusMeters: 10000 },
       );
     });
+
+    it('should filter to published properties only', async () => {
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+      await service.search({});
+
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'property.status = :status',
+        { status: PropertyStatus.PUBLISHED },
+      );
+    });
   });
 
   describe('findMine', () => {
@@ -266,6 +292,22 @@ describe('PropertyService', () => {
         'Rua A, 1, Centro, São Paulo, SP, 80000-000',
       );
       expect(mockQueryBuilder.setParameters).toHaveBeenCalledWith({ lng: -46.6333, lat: -23.5505 });
+    });
+
+    it('should accept any status transition without validation', async () => {
+      const existing = {
+        id: 'prop-1', ownerId: 'owner-1', status: PropertyStatus.PUBLISHED,
+        street: 'Rua A', number: '1', neighborhood: 'Centro', city: 'Curitiba', state: 'PR', zipCode: '80000-000',
+      } as Property;
+      mockRepo.findOne.mockResolvedValue(existing);
+      mockRepo.save.mockImplementation((p) => Promise.resolve(p));
+
+      const result = await service.update('prop-1', 'owner-1', { status: PropertyStatus.DRAFT });
+
+      expect(result.status).toBe(PropertyStatus.DRAFT);
+      expect(mockRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'prop-1', status: PropertyStatus.DRAFT }),
+      );
     });
   });
 

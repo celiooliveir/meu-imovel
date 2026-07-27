@@ -1,7 +1,7 @@
 import {
   IsString, IsEnum, IsNumber, IsInt, IsOptional, Min, Length, Matches, MinLength,
 } from 'class-validator';
-import { PropertyType, TransactionType } from '../property.entity';
+import { PropertyType, TransactionType, PropertyStatus } from '../property.entity';
 
 export class CreatePropertyDto {
   @IsString()
@@ -56,4 +56,8 @@ export class CreatePropertyDto {
   @IsString()
   @Matches(/^\d{5}-?\d{3}$/, { message: 'zipCode deve estar no formato CEP (00000-000)' })
   zipCode: string;
+
+  @IsOptional()
+  @IsEnum(PropertyStatus)
+  status?: PropertyStatus;
 }

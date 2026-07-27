@@ -1,7 +1,7 @@
 import {
-  IsString, IsEnum, IsNumber, IsInt, IsOptional, IsBoolean, Min, Length, Matches, MinLength,
+  IsString, IsEnum, IsNumber, IsInt, IsOptional, Min, Length, Matches, MinLength,
 } from 'class-validator';
-import { PropertyType, TransactionType } from '../property.entity';
+import { PropertyType, TransactionType, PropertyStatus } from '../property.entity';
 
 export class UpdatePropertyDto {
   @IsOptional()
@@ -69,6 +69,6 @@ export class UpdatePropertyDto {
   zipCode?: string;
 
   @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
+  @IsEnum(PropertyStatus)
+  status?: PropertyStatus;
 }

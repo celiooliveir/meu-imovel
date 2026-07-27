@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { Property } from './property.entity';
+import { Property, PropertyStatus } from './property.entity';
 import { PropertyPhoto } from './property-photo.entity';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { SearchPropertyQueryDto } from './dto/search-property-query.dto';
@@ -47,7 +47,7 @@ export class PropertyService {
 
     const qb = this.propertyRepo
       .createQueryBuilder('property')
-      .where('property.isActive = :isActive', { isActive: true });
+      .where('property.status = :status', { status: PropertyStatus.PUBLISHED });
 
     if (query.city) qb.andWhere('property.city ILIKE :city', { city: query.city });
     if (query.type) qb.andWhere('property.type = :type', { type: query.type });

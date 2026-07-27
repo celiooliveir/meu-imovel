@@ -1,4 +1,4 @@
-import { Property, PropertyType, TransactionType } from '../property.entity';
+import { Property, PropertyType, TransactionType, PropertyStatus } from '../property.entity';
 
 export interface PropertyPhotoResponse {
   id: string;
@@ -23,7 +23,7 @@ export class PropertyResponseDto {
   zipCode: string;
   latitude: number | null;
   longitude: number | null;
-  isActive: boolean;
+  status: PropertyStatus;
   ownerId: string;
   createdAt: Date;
   photos: PropertyPhotoResponse[];
@@ -48,7 +48,7 @@ export class PropertyResponseDto {
     dto.zipCode = property.zipCode;
     dto.latitude = property.latitude;
     dto.longitude = property.longitude;
-    dto.isActive = property.isActive;
+    dto.status = property.status;
     dto.ownerId = property.ownerId;
     dto.createdAt = property.createdAt;
     dto.photos = [...(property.photos ?? [])]

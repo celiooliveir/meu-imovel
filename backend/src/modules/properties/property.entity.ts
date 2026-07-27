@@ -15,6 +15,12 @@ export enum TransactionType {
   RENT = 'rent',
 }
 
+export enum PropertyStatus {
+  DRAFT = 'draft',
+  PUBLISHED = 'published',
+  CLOSED = 'closed',
+}
+
 const decimalTransformer = {
   to: (value?: number | null) => value,
   from: (value?: string | null) => (value === null || value === undefined ? value : parseFloat(value)),
@@ -78,8 +84,8 @@ export class Property extends BaseEntity {
   @Column({ type: 'geography', spatialFeatureType: 'Point', srid: 4326, nullable: true, select: false })
   location: string | null;
 
-  @Column({ default: true })
-  isActive: boolean;
+  @Column({ type: 'enum', enum: PropertyStatus, default: PropertyStatus.PUBLISHED })
+  status: PropertyStatus;
 
   @Column({ type: 'uuid' })
   ownerId: string;
