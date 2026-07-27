@@ -33,7 +33,8 @@ describe('Properties (e2e)', () => {
   let rioFlatId: string;
   let curitibaLandId: string;
   let mutableId: string;
-  let inactivePropertyId: string;
+  let closedPropertyId: string;
+  let draftPropertyId: string;
 
   beforeAll(async () => {
     const tempDs = new DataSource({
@@ -167,7 +168,7 @@ describe('Properties (e2e)', () => {
     });
     mutableId = mutableProperty.body.id;
 
-    const inactiveProperty = await createAsOwner({
+    const closedProperty = await createAsOwner({
       title: 'Sala comercial fechada temporariamente',
       description: 'Sala comercial atualmente fora do mercado, aguardando reforma.',
       type: 'commercial',
@@ -180,12 +181,28 @@ describe('Properties (e2e)', () => {
       state: 'RS',
       zipCode: '90010-000',
     });
-    inactivePropertyId = inactiveProperty.body.id;
+    closedPropertyId = closedProperty.body.id;
 
     await request(app.getHttpServer())
-      .patch(`/api/v1/properties/${inactivePropertyId}`)
+      .patch(`/api/v1/properties/${closedPropertyId}`)
       .set('Authorization', `Bearer ${ownerToken}`)
-      .send({ isActive: false });
+      .send({ status: 'closed' });
+
+    const draftProperty = await createAsOwner({
+      title: 'Apartamento ainda não publicado',
+      description: 'Apartamento em fase de elaboração do anúncio, ainda não publicado.',
+      type: 'apartment',
+      transactionType: 'sale',
+      price: 420000,
+      street: 'Rua Marechal Deodoro',
+      number: '77',
+      neighborhood: 'Centro',
+      city: 'Porto Alegre',
+      state: 'RS',
+      zipCode: '90010-001',
+      status: 'draft',
+    });
+    draftPropertyId = draftProperty.body.id;
   });
 
   afterAll(async () => {
@@ -221,7 +238,7 @@ describe('Properties (e2e)', () => {
     expect(res.body.id).toBeDefined();
     expect(res.body.title).toBe(validProperty.title);
     expect(res.body.price).toBe(validProperty.price);
-    expect(res.body.isActive).toBe(true);
+    expect(res.body.status).toBe('published');
     expect(res.body.ownerId).toBeDefined();
     expect(res.body.latitude).toBeCloseTo(-19.9167, 3);
     expect(res.body.longitude).toBeCloseTo(-43.9345, 3);
@@ -377,6 +394,17 @@ describe('Properties (e2e)', () => {
     expect(res.body.items[0].distanceKm).toBeUndefined();
   });
 
+  it('GET /api/v1/properties — não retorna imóveis em rascunho ou fechados', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/properties')
+      .set('Authorization', `Bearer ${tenantToken}`)
+      .expect(200);
+
+    const ids = res.body.items.map((p: { id: string }) => p.id);
+    expect(ids).not.toContain(draftPropertyId);
+    expect(ids).not.toContain(closedPropertyId);
+  });
+
   it('GET /api/v1/properties/:id — retorna o imóvel', async () => {
     const res = await request(app.getHttpServer())
       .get(`/api/v1/properties/${spFlatId}`)
@@ -401,7 +429,7 @@ describe('Properties (e2e)', () => {
       .expect(400);
   });
 
-  it('GET /api/v1/properties/mine — retorna os imóveis do dono autenticado, incluindo inativos', async () => {
+  it('GET /api/v1/properties/mine — retorna os imóveis do dono autenticado, incluindo rascunhos e fechados', async () => {
     const res = await request(app.getHttpServer())
       .get('/api/v1/properties/mine')
       .set('Authorization', `Bearer ${ownerToken}`)
@@ -409,7 +437,7 @@ describe('Properties (e2e)', () => {
 
     const ids = res.body.items.map((p: { id: string }) => p.id);
     expect(ids).toEqual(
-      expect.arrayContaining([spFlatId, spHouseId, rioFlatId, curitibaLandId, inactivePropertyId]),
+      expect.arrayContaining([spFlatId, spHouseId, rioFlatId, curitibaLandId, draftPropertyId, closedPropertyId]),
     );
   });
 
@@ -421,7 +449,7 @@ describe('Properties (e2e)', () => {
 
     const ids = res.body.items.map((p: { id: string }) => p.id);
     expect(ids).not.toContain(spFlatId);
-    expect(ids).not.toContain(inactivePropertyId);
+    expect(ids).not.toContain(closedPropertyId);
   });
 
   it('GET /api/v1/properties/mine — buyer_tenant recebe 403', async () => {
