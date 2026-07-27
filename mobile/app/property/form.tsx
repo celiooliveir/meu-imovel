@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
-import { propertyApi, PropertyType, TransactionType } from '../../services/properties';
+import { propertyApi, PropertyType, TransactionType, PropertyStatus } from '../../services/properties';
 
 const TYPE_OPTIONS = [
   { key: PropertyType.APARTMENT, label: 'Apartamento' },
@@ -15,6 +15,12 @@ const TYPE_OPTIONS = [
 const TRANSACTION_OPTIONS = [
   { key: TransactionType.SALE, label: 'Venda' },
   { key: TransactionType.RENT, label: 'Aluguel' },
+];
+
+const STATUS_OPTIONS = (transactionType: TransactionType) => [
+  { key: PropertyStatus.DRAFT, label: 'Rascunho' },
+  { key: PropertyStatus.PUBLISHED, label: 'Publicado' },
+  { key: PropertyStatus.CLOSED, label: transactionType === TransactionType.RENT ? 'Alugado' : 'Vendido' },
 ];
 
 interface ViaCepResponse {
@@ -43,7 +49,7 @@ export default function PropertyForm() {
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [zipCode, setZipCode] = useState('');
-  const [isActive, setIsActive] = useState(true);
+  const [status, setStatus] = useState<PropertyStatus>(PropertyStatus.PUBLISHED);
   const [saving, setSaving] = useState(false);
   const [loadingProperty, setLoadingProperty] = useState(isEditing);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -69,7 +75,7 @@ export default function PropertyForm() {
         setState(data.state);
         setZipCode(data.zipCode);
         setLastCheckedZip(data.zipCode.replace(/\D/g, ''));
-        setIsActive(data.isActive);
+        setStatus(data.status);
       })
       .catch(() => Alert.alert('Erro', 'Não foi possível carregar o imóvel'))
       .finally(() => setLoadingProperty(false));
@@ -145,7 +151,7 @@ export default function PropertyForm() {
     setSaving(true);
     try {
       if (isEditing && id) {
-        await propertyApi.update(id, { ...buildPayload(), isActive });
+        await propertyApi.update(id, { ...buildPayload(), status });
         router.back();
       } else {
         const { data } = await propertyApi.create(buildPayload());
@@ -253,10 +259,22 @@ export default function PropertyForm() {
       />
 
       {isEditing ? (
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Anúncio ativo</Text>
-          <Switch value={isActive} onValueChange={setIsActive} />
-        </View>
+        <>
+          <Text style={styles.sectionLabel}>Status</Text>
+          <View style={styles.optionsRow}>
+            {STATUS_OPTIONS(transactionType).map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.option, status === opt.key && styles.optionSelected]}
+                onPress={() => setStatus(opt.key)}
+              >
+                <Text style={[styles.optionText, status === opt.key && styles.optionTextSelected]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
       ) : null}
 
       <Button title={isEditing ? 'Salvar' : 'Publicar'} onPress={handleSubmit} loading={saving} />
@@ -292,11 +310,6 @@ const styles = StyleSheet.create({
   optionSelected: { backgroundColor: '#1a56db', borderColor: '#1a56db' },
   optionText: { fontSize: 14, color: '#374151' },
   optionTextSelected: { color: '#fff', fontWeight: '700' },
-  switchRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 16, paddingVertical: 8,
-  },
-  switchLabel: { fontSize: 15, color: '#111827', fontWeight: '600' },
   deleteButtonWrapper: { marginTop: 4 },
   manageButtonWrapper: { marginTop: 4 },
 });
