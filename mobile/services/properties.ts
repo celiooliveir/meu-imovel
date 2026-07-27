@@ -119,4 +119,13 @@ export const propertyApi = {
   },
 
   deletePhoto: (id: string, photoId: string) => api.delete(`/properties/${id}/photos/${photoId}`),
+
+  favorite: (id: string) => api.post(`/properties/${id}/favorite`),
+
+  unfavorite: (id: string) => api.delete(`/properties/${id}/favorite`),
+
+  getFavorites: (page?: number) =>
+    api.get<PropertySearchResult>('/properties/favorites', { params: { page } }),
+
+  getFavoriteIds: () => api.get<string[]>('/properties/favorites/ids'),
 };
