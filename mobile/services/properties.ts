@@ -12,6 +12,12 @@ export enum TransactionType {
   RENT = 'rent',
 }
 
+export enum PropertyStatus {
+  DRAFT = 'draft',
+  PUBLISHED = 'published',
+  CLOSED = 'closed',
+}
+
 export interface PropertyPhoto {
   id: string;
   url: string;
@@ -35,7 +41,7 @@ export interface Property {
   zipCode: string;
   latitude: number | null;
   longitude: number | null;
-  isActive: boolean;
+  status: PropertyStatus;
   ownerId: string;
   createdAt: string;
   photos: PropertyPhoto[];
@@ -81,7 +87,7 @@ export interface PropertyInput {
 }
 
 export interface UpdatePropertyInput extends Partial<PropertyInput> {
-  isActive?: boolean;
+  status?: PropertyStatus;
 }
 
 export interface UploadablePhoto {
